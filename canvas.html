@@ -120,7 +120,7 @@
         }
 
         function draw_points(ctx, points) {
-            debugger;
+            // debugger;
             const l = points.length;
 
             if (l === 0) {
@@ -129,7 +129,7 @@
 
             // points = points.slice(Math.floor(l - Math.sqrt(l)));
 
-            points = points.map(s => [s[0] * scale, -s[1] * scale])
+            points = points.map(s => [s.re * scale, -s.im * scale])
 
             ctx.save();
             ctx.beginPath();
@@ -223,10 +223,10 @@
                         y: event.clientY - rect.top
                     })
             );
-            return [
+            return Complex(
                 point_unscaled.x / scale,
                 -point_unscaled.y / scale
-            ]
+            )
         }
 
         [in_ctx, out_ctx].forEach(ctx => {
