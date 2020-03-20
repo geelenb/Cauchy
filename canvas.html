@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <style>
+        body {
+            background: black;
+        }
+
+        canvas {
+            background: white;
+        }
+    </style>
+
+</head>
+<body>
+    <canvas id="input_canvas" height="500px" width="500px"></canvas>
+    <canvas id="output_canvas" height="500px" width="500px"></canvas>
+
+    <script>
+        const inf = 1_000_000_000;
+        const scale = 100;
+
+        const in_ctx = document.getElementById('input_canvas').getContext('2d');
+        const out_ctx = document.getElementById('output_canvas').getContext('2d');
+
+        in_ctx.translate(3 * scale, 2.5 * scale);
+        out_ctx.translate(2.5 * scale, 2.5 * scale);
+
+        let wand_points = [];
+        let poles = [];
+
+        function add_drag(ctx) {
+            ctx.canvas.addEventListener('mousedown', (event) => {
+                ctx.canvas.isdragging = true;
+            });
+
+            const enddrag = () => ctx.canvas.isdragging = false;
+
+            ctx.canvas.addEventListener('mouseup', enddrag);
+            ctx.canvas.addEventListener('mouseout', enddrag);
+
+            ctx.canvas.addEventListener('mousemove', (event) => {
+                if (ctx.canvas.isdragging) {
+                    ctx.translate(event.movementX, event.movementY);
+                    requestAnimationFrame(redraw_all)
+                }
+            });
+        }
+
+        function add_zoom(ctx) {
+            ctx.canvas.addEventListener('wheel', (event) => {
+                // ctx.canvas.isdragging = true;
+                // debugger;
+                console.log(1)
+                // event.preventDefault();
+
+            }, false);
+        }
+
+        function add_axes(ctx) {
+            ctx.font = '14px serif';
+
+            ctx.strokestyle = 'black';
+            ctx.lineWidth = 1;
+
+            ctx.beginPath();
+            ctx.moveTo(-1_000 * scale, 0);
+            ctx.lineTo(+1_000 * scale, 0);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, -inf);
+            ctx.lineTo(0, +inf);
+            ctx.stroke();
+
+            // labels
+            for (let i = -100; i <= 100; i++) {
+                if (i === 0) {
+                    continue;
+                }
+
+                // x axis
+                ctx.beginPath();
+                ctx.moveTo(i * scale, 0);
+                ctx.lineTo(i * scale, 6);
+                ctx.stroke();
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'hanging';
+                ctx.fillText(`${i}`, i * scale, 10);
+
+                // y axis
+                ctx.beginPath();
+                ctx.moveTo(0, i * scale);
+                ctx.lineTo(-6, i * scale);
+                ctx.stroke();
+
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${i}j`, -10, -i * scale);
+            }
+
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'hanging';
+            ctx.fillText('0', -10, 10)
+        }
+
+        function redraw(ctx) {
+            ctx.clearRect(-inf, -inf, inf*2, inf*2);
+            add_axes(ctx);
+        }
+
+        function draw_points(ctx, points) {
+            // debugger;
+            if (points.length === 0) {
+                return;
+            }
+
+            points = points.map(s => [s[0] * scale, -s[1] * scale])
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(...(points[0]));
+
+            points.forEach(point => {
+                ctx.strokeStyle = 'cyan';
+                ctx.lineTo(...point);
+            });
+
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function redraw_in() {
+            in_ctx.clearRect(-inf, -inf, inf*2, inf*2);
+            add_axes(in_ctx);
+            draw_points(in_ctx, wand_points.slice(wand_points.length / 2));
+        }
+
+        function redraw_out() {
+            out_ctx.clearRect(-inf, -inf, inf*2, inf*2);
+            add_axes(out_ctx);
+            draw_points(out_ctx, wand_points.slice(wand_points.length / 2))
+        }
+
+        function redraw_all() {
+            redraw_in();
+            redraw_out();
+        }
+
+        function coor_for_event(event, ctx) {
+            const rect = ctx.canvas.getBoundingClientRect();
+            const point_unscaled = (ctx
+                    .getTransform()
+                    .inverse()
+                    .transformPoint({
+                        x: event.clientX - rect.left,
+                        y: event.clientY - rect.top
+                    })
+            );
+            return [
+                point_unscaled.x / scale,
+                -point_unscaled.y / scale
+            ]
+        }
+
+        [in_ctx, out_ctx].forEach(ctx => {
+            add_drag(ctx);
+        });
+
+        requestAnimationFrame(redraw_all);
+
+        in_ctx.canvas.addEventListener('mousemove', (event) => {
+            const coor = coor_for_event(event, in_ctx);
+            wand_points.push(coor);
+            requestAnimationFrame(redraw_all);
+        });
+
+    </script>
+</body>
+</html>
