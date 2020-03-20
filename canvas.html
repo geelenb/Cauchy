@@ -60,7 +60,7 @@
             ctx.canvas.addEventListener('wheel', (event) => {
                 // ctx.canvas.isdragging = true;
                 // debugger;
-                console.log(1)
+                console.log('wheel')
                 // event.preventDefault();
 
             }, false);
@@ -144,8 +144,45 @@
             ctx.restore();
         }
 
+
+        function draw_in_phasors() {
+            if (wand_points.length === 0) {
+                return;
+            }
+            const s = wand_points[wand_points.length - 1];
+            in_ctx.save();
+            const r = 10;
+            in_ctx.strokeStyle = 'lightgrey';
+            poles.concat(zeros).forEach(c => {
+                in_ctx.beginPath();
+                in_ctx.moveTo(s.re * scale, -s.im * scale);
+                in_ctx.lineTo(c.re * scale, -c.im * scale);
+                in_ctx.stroke();
+            });
+
+            in_ctx.strokeStyle = 'red';
+            poles.forEach(p => {
+                in_ctx.beginPath();
+                in_ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
+                in_ctx.stroke();
+            });
+
+            in_ctx.strokeStyle = 'darkgreen';
+            zeros.forEach(p => {
+                in_ctx.beginPath();
+                in_ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
+                in_ctx.stroke();
+            });
+
+            in_ctx.restore()
+        }
+
+        function draw_out_phasors() {
+
+        }
+
         function draw_poles() {
-            const size = 3
+            const size = 3;
             in_ctx.save();
             poles.forEach(p => {
                 in_ctx.beginPath();
@@ -182,19 +219,24 @@
                 s = Complex(s);
                 const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
                 const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
-                const r = counter.mul(K).div(denominator);
-                // debugger;
-                return r;
+                return counter.mul(K).div(denominator);
             }
         }
 
         let f = make_function();
 
+        function last_sqrt_items_of_list(l) {
+            const n = l.length;
+            return l.slice(Math.floor(n - Math.sqrt(n)));
+        }
+
         function redraw_in() {
             in_ctx.clearRect(-inf, -inf, inf*2, inf*2);
             add_axes(in_ctx);
             const l = wand_points.length;
-            draw_points(in_ctx, wand_points.slice(Math.floor(l - Math.sqrt(l))));
+            draw_points(in_ctx, last_sqrt_items_of_list(wand_points));
+
+            draw_in_phasors();
 
             draw_poles();
             draw_zeros();
@@ -204,8 +246,9 @@
             out_ctx.clearRect(-inf, -inf, inf*2, inf*2);
             add_axes(out_ctx);
 
-            const l = wand_points_transformed.length;
-            draw_points(out_ctx, wand_points_transformed.slice(Math.floor(l - Math.sqrt(l))));
+            draw_points(out_ctx, last_sqrt_items_of_list(wand_points_transformed));
+
+            draw_out_phasors();
         }
 
         function redraw_all() {
@@ -229,6 +272,10 @@
             )
         }
 
+        function distances(a, l) {
+            return l.map(b => a.sub(b).abs())
+        }
+
         [in_ctx, out_ctx].forEach(ctx => {
             add_drag(ctx);
         });
@@ -239,20 +286,29 @@
             const coor = coor_for_event(event, in_ctx);
             wand_points.push(coor);
             wand_points_transformed.push(f(coor));
-            console.log(f(coor));
 
             requestAnimationFrame(redraw_all);
         });
 
         in_ctx.canvas.addEventListener('click', (event) => {
-            const clicked = Complex(coor_for_event(event, in_ctx))
-            zeros.push(clicked);
+            const clicked = Complex(coor_for_event(event, in_ctx));
+
+            const l = zeros.length;
+            zeros = zeros.filter(z => clicked.sub(z).abs() > .2);
+            if (zeros.length === l){
+                zeros.push(clicked);
+            }
+
             redraw_in();
         });
 
         in_ctx.canvas.addEventListener('contextmenu', (event) => {
             const clicked = Complex(coor_for_event(event, in_ctx));
-            poles.push(clicked);
+            const l = poles.length;
+            poles = poles.filter(z => clicked.sub(z).abs() > .2);
+            if (poles.length === l){
+                poles.push(clicked);
+            }
             redraw_in();
             event.preventDefault();
         }, false);
