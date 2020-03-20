@@ -14,6 +14,8 @@
         }
     </style>
 
+    <script src="math.min.js"></script>
+    <script src="complex.min.js"></script>
 </head>
 <body>
     <canvas id="input_canvas" height="500px" width="500px"></canvas>
@@ -30,7 +32,11 @@
         out_ctx.translate(2.5 * scale, 2.5 * scale);
 
         let wand_points = [];
-        let poles = [];
+        let wand_points_transformed = [];
+
+        let zeros = [Complex(-1)];
+        let poles = [Complex(-2, -2), Complex(-2, 2)];
+        let K = 1;
 
         function add_drag(ctx) {
             ctx.canvas.addEventListener('mousedown', (event) => {
@@ -114,10 +120,14 @@
         }
 
         function draw_points(ctx, points) {
-            // debugger;
-            if (points.length === 0) {
+            debugger;
+            const l = points.length;
+
+            if (l === 0) {
                 return;
             }
+
+            // points = points.slice(Math.floor(l - Math.sqrt(l)));
 
             points = points.map(s => [s[0] * scale, -s[1] * scale])
 
@@ -134,16 +144,68 @@
             ctx.restore();
         }
 
+        function draw_poles() {
+            const size = 3
+            in_ctx.save();
+            poles.forEach(p => {
+                in_ctx.beginPath();
+                in_ctx.moveTo(p.re * scale - size, -(p.im * scale - size));
+                in_ctx.lineTo(p.re * scale + size, -(p.im * scale + size));
+                in_ctx.stroke();
+                in_ctx.beginPath();
+                in_ctx.moveTo(p.re * scale - size, -(p.im * scale + size));
+                in_ctx.lineTo(p.re * scale + size, -(p.im * scale - size));
+                in_ctx.stroke();
+            });
+
+            in_ctx.restore();
+        }
+
+        function draw_zeros() {
+            const r = 5;
+            in_ctx.save();
+            zeros.forEach(p => {
+                in_ctx.beginPath();
+                // in_ctx.moveTo(p.re * scale, -(p.im * scale));
+                in_ctx.arc(p.re * scale, -(p.im * scale), r, 0, Math.PI * 2 );
+                in_ctx.stroke();
+            });
+
+            in_ctx.restore();
+
+        }
+
+        const mul = (a, b) => a.mul(b);
+
+        function make_function() {
+            return s => {
+                s = Complex(s);
+                const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
+                const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
+                const r = counter.mul(K).div(denominator);
+                // debugger;
+                return r;
+            }
+        }
+
+        let f = make_function();
+
         function redraw_in() {
             in_ctx.clearRect(-inf, -inf, inf*2, inf*2);
             add_axes(in_ctx);
-            draw_points(in_ctx, wand_points.slice(wand_points.length / 2));
+            const l = wand_points.length;
+            draw_points(in_ctx, wand_points.slice(Math.floor(l - Math.sqrt(l))));
+
+            draw_poles();
+            draw_zeros();
         }
 
         function redraw_out() {
             out_ctx.clearRect(-inf, -inf, inf*2, inf*2);
             add_axes(out_ctx);
-            draw_points(out_ctx, wand_points.slice(wand_points.length / 2))
+
+            const l = wand_points_transformed.length;
+            draw_points(out_ctx, wand_points_transformed.slice(Math.floor(l - Math.sqrt(l))));
         }
 
         function redraw_all() {
@@ -176,8 +238,24 @@
         in_ctx.canvas.addEventListener('mousemove', (event) => {
             const coor = coor_for_event(event, in_ctx);
             wand_points.push(coor);
+            wand_points_transformed.push(f(coor));
+            console.log(f(coor));
+
             requestAnimationFrame(redraw_all);
         });
+
+        in_ctx.canvas.addEventListener('click', (event) => {
+            const clicked = Complex(coor_for_event(event, in_ctx))
+            zeros.push(clicked);
+            redraw_in();
+        });
+
+        in_ctx.canvas.addEventListener('contextmenu', (event) => {
+            const clicked = Complex(coor_for_event(event, in_ctx));
+            poles.push(clicked);
+            redraw_in();
+            event.preventDefault();
+        }, false);
 
     </script>
 </body>
