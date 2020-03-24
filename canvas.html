@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Cauchy</title>
     <style>
         body {
         }
@@ -326,8 +326,12 @@
             redraw_out();
         }
 
-        function round_2(num) {
-            return Math.round( num * 100 + Number.EPSILON ) / 100
+        function round_point(c) {
+            const round = num => Math.round( num * 10 + Number.EPSILON ) / 10;
+            return Complex(
+                round(c.re),
+                round(c.im)
+            )
         }
 
         function coor_for_event(event, ctx) {
@@ -342,8 +346,8 @@
             );
 
             return Complex(
-                round_2(point_unscaled.x) / scale,
-                -round_2(point_unscaled.y) / scale
+                point_unscaled.x / scale,
+                -point_unscaled.y / scale
             )
         }
 
@@ -413,7 +417,7 @@
             const l = zeros.length;
             zeros = zeros.filter(z => clicked.sub(z).abs() > .2);
             if (zeros.length === l){
-                zeros.push(clicked);
+                zeros.push(round_point(clicked));
             }
 
             tail_transformed = tail.map(make_function());
@@ -427,7 +431,7 @@
             const l = poles.length;
             poles = poles.filter(z => clicked.sub(z).abs() > .2);
             if (poles.length === l){
-                poles.push(clicked);
+                poles.push(round_point(clicked));
             }
 
             tail_transformed = tail.map(make_function());
@@ -445,7 +449,7 @@
         }
 
         krange.addEventListener('input', kchanged);
-        kchanged()
+        kchanged();
 
     </script>
 </body>
