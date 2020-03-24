@@ -26,6 +26,12 @@
         <button onclick="set_mode('interactive')">Interactief</button>
     </div>
 
+    <p>
+        K = 10<sup><span id="kspan"></span></sup>
+        <br>
+        <input type="range" min="-2" max="2" step='.01' id="krange" >
+    </p>
+
     <div id="container">
         <canvas id="input_canvas" height="500px" width="500px"></canvas>
         <canvas id="output_canvas" height="500px" width="500px"></canvas>
@@ -36,12 +42,14 @@
 
         const in_ctx = document.getElementById('input_canvas').getContext('2d');
         const out_ctx = document.getElementById('output_canvas').getContext('2d');
+        const krange = document.getElementById('krange');
+        const kspan = document.getElementById('kspan');
 
         in_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
         out_ctx.translate(out_ctx.canvas.height / 2, out_ctx.canvas.height / 2);
 
-        let wand_points = [];
-        let wand_points_transformed = [];
+        let tail = [];
+        let tail_transformed = [];
         let points_start_index = 30;
 
         let zeros = [Complex(-2)];
@@ -122,8 +130,15 @@
             ctx.fillText('0', -10, 10)
         }
 
+        function headpoint(points) {
+            if (mode === 'interactive') {
+                return points[points.length - 1];
+            } else {
+                return points[(points_start_index - 1 + points.length) % points.length];
+            }
+        }
+
         function draw_points(ctx, points) {
-            // debugger;
             const l = points.length;
 
             if (l === 0) {
@@ -151,21 +166,21 @@
             ctx.stroke();
 
             const point = points[points.length - 1];
+            ctx.fillStyle = ctx.strokeStyle;
             ctx.beginPath();
             ctx.arc(point[0], point[1], 3, 0, 2 * Math.PI);
-            // ctx.arc(-1*scale, 0, 30, 0, 2 * Math.PI);
-            // console.log(point[0] / scal);
-            ctx.fillStyle = ctx.strokeStyle;
             ctx.fill();
 
             ctx.restore();
         }
 
         function draw_in_phasors() {
-            if (wand_points.length === 0) {
+            if (tail.length === 0) {
                 return;
             }
-            const s = wand_points[wand_points.length - 1];
+
+            const s = headpoint(tail);
+
             in_ctx.save();
             const r = 10;
             in_ctx.strokeStyle = 'lightgrey';
@@ -184,9 +199,9 @@
             });
 
             in_ctx.strokeStyle = 'darkgreen';
-            zeros.forEach(p => {
+            zeros.forEach(z => {
                 in_ctx.beginPath();
-                in_ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
+                in_ctx.arc(z.re * scale, -z.im * scale, r, -s.sub(z).arg(), 0);
                 in_ctx.stroke();
             });
 
@@ -194,17 +209,18 @@
         }
 
         function draw_out_phasors() {
-            if (wand_points.length === 0) {
+            if (tail.length === 0) {
                 return;
             }
             let sum_phase = 0;
             let r = 10;
 
-            const s = wand_points[wand_points.length - 1];
+            const s = headpoint(tail);
             out_ctx.save();
 
             out_ctx.strokeStyle = 'lightgrey';
-            const fs = wand_points_transformed[wand_points_transformed.length-1]
+            const fs = headpoint(tail_transformed);
+
             out_ctx.beginPath();
             out_ctx.moveTo(0, 0);
             out_ctx.lineTo(fs.re * scale, -fs.im * scale);
@@ -288,7 +304,7 @@
             in_ctx.clearRect(-1000, -1000, 2000, 2000);
             add_axes(in_ctx);
             // debugger;
-            draw_points(in_ctx, wand_points);
+            draw_points(in_ctx, tail);
 
             draw_in_phasors();
 
@@ -299,9 +315,8 @@
         function redraw_out() {
             out_ctx.clearRect(-1000, -1000, 2000, 2000);
             add_axes(out_ctx);
-            // debugger;
 
-            draw_points(out_ctx, wand_points_transformed);
+            draw_points(out_ctx, tail_transformed);
 
             draw_out_phasors();
         }
@@ -309,6 +324,10 @@
         function redraw_all() {
             redraw_in();
             redraw_out();
+        }
+
+        function round_2(num) {
+            return Math.round( num * 100 + Number.EPSILON ) / 100
         }
 
         function coor_for_event(event, ctx) {
@@ -321,20 +340,21 @@
                         y: event.clientY - rect.top
                     })
             );
+
             return Complex(
-                point_unscaled.x / scale,
-                -point_unscaled.y / scale
+                round_2(point_unscaled.x) / scale,
+                -round_2(point_unscaled.y) / scale
             )
         }
 
         function circle_around(p) {
             const n = 1000;
-            return [...Array(n).keys()].reverse().map(v => p.add({arg: ((v / n) * 2 * Math.PI), abs: 0.5}));
+            return [...Array(n).keys()].reverse().map(v => p.add({arg: ((v / n) * 2 * Math.PI), abs: 0.8}));
         }
 
         function nyquist_contour() {
-            const n = 100;
-            const omega_js = [...Array(n).keys()].map(o => Math.exp(o-(n/2))).map(o => Complex.I.mul(o));
+            const n = 1000;
+            const omega_js = [...Array(n).keys()].map(o => (o + 1) / 10).map(o => Complex.I.mul(o));
             return omega_js.concat([Complex.INFINITY], omega_js.map(oj => oj.conjugate()).reverse(), [Complex.ZERO]);
         }
 
@@ -352,17 +372,17 @@
             window.mode = new_mode;
 
             if (new_mode === 'interactive') {
-                wand_points = [];
-                wand_points_transformed = [];
+                tail = [];
+                tail_transformed = [];
             } else if (new_mode === 'zero') {
-                wand_points = circle_around(zeros[0]);
-                wand_points_transformed = wand_points.map(make_function());
+                tail = circle_around(zeros[0]);
+                tail_transformed = tail.map(make_function());
             } else if (new_mode === 'pole') {
-                wand_points = circle_around(poles[0]);
-                wand_points_transformed = wand_points.map(make_function());
+                tail = circle_around(poles[0]);
+                tail_transformed = tail.map(make_function());
             } else if (new_mode === 'nyquist') {
-                wand_points = nyquist_contour();
-                wand_points_transformed = wand_points.map(make_function());
+                tail = nyquist_contour();
+                tail_transformed = tail.map(make_function());
             }
             requestAnimationFrame(redraw_all);
 
@@ -379,19 +399,16 @@
         in_ctx.canvas.addEventListener('mousemove', (event) => {
             if (mode === 'interactive') {
                 const coor = coor_for_event(event, in_ctx);
-                wand_points.push(coor);
-                wand_points_transformed.push(make_function()(coor));
-
-                // if (Math.random() < .8) {
-                //     wand_points = wand_points.slice(1);
-                //     wand_points_transformed = wand_points_transformed.slice(1);
-                // }
+                tail.push(coor);
+                tail_transformed.push(make_function()(coor));
             }
             requestAnimationFrame(redraw_all);
         });
 
+
+
         in_ctx.canvas.addEventListener('click', (event) => {
-            const clicked = Complex(coor_for_event(event, in_ctx));
+            const clicked = coor_for_event(event, in_ctx);
 
             const l = zeros.length;
             zeros = zeros.filter(z => clicked.sub(z).abs() > .2);
@@ -399,13 +416,13 @@
                 zeros.push(clicked);
             }
 
-            wand_points_transformed = wand_points.map(make_function())
+            tail_transformed = tail.map(make_function());
             requestAnimationFrame(redraw_all);
             event.preventDefault();
         });
 
         in_ctx.canvas.addEventListener('contextmenu', (event) => {
-            const clicked = Complex(coor_for_event(event, in_ctx));
+            const clicked = coor_for_event(event, in_ctx);
 
             const l = poles.length;
             poles = poles.filter(z => clicked.sub(z).abs() > .2);
@@ -413,10 +430,22 @@
                 poles.push(clicked);
             }
 
-            wand_points_transformed = wand_points.map(make_function())
+            tail_transformed = tail.map(make_function());
             requestAnimationFrame(redraw_all);
             event.preventDefault();
         }, false);
+
+
+        function kchanged() {
+            K = Math.pow(10, krange.value);
+            kspan.innerText = krange.value;
+
+            tail_transformed = tail.map(make_function());
+            redraw_out();
+        }
+
+        krange.addEventListener('input', kchanged);
+        kchanged()
 
     </script>
 </body>
