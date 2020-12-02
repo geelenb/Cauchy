@@ -2,15 +2,43 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Cauchy</title>
+    <title>Visualizing closed loop poles</title>
     <style>
-        body {
+        div#container {
+            text-align: center;
+            display: inline-block;
+        }
+
+        div#container > div {
+            text-align: center;
+            width: 500px;
+            margin: 12px;
+            float: left
+        }
+
+        div#container > div > h3 {
+            margin-top: 0;
         }
 
         canvas {
-            margin: 12px;
             box-shadow: black 0px 0 12px;
             border-radius: 12px;
+        }
+
+        table.equationtable {
+            border-collapse: collapse;
+        }
+
+        table.equationtable td.counter {
+            border-bottom: 1px solid black;
+        }
+
+        h1, h2, h3 {
+            font-family: Futura, Helvetica, "Helvetica Neue", sans-serif;
+        }
+
+        p, div {
+            font-family: Optima, sans-serif;
         }
     </style>
 
@@ -20,596 +48,738 @@
     <script src="polynomial.js"></script>
 </head>
 <body>
+<h1 style="text-align: center;">Visualizing closed loop poles</h1>
 
-    <div style="text-align: center;">
-        <button onclick="set_mode('zero')">Oscilleer rond een nulpunt</button>
-        <button onclick="set_mode('pole')">Oscilleer rond een pool</button>
-        <button onclick="set_mode('nyquist')">Nyquistcontour</button>
-        <button onclick="set_mode('interactive')">Interactief</button>
+<div id="container">
+    <div>
+        <h3>s-plane</h3>
+        <canvas height="500px" id="input_canvas" width="500px"></canvas>
+        <p>
+            This is the input screen, showing the poles and zeros of the function G(s).
+            Add or remove zeros and poles to G by left- and right-clicking.
+        </p>
+        <div style="width: 11ch; display: inline-block; text-align: left;">
+            K = 10<sup><span id="kspan"></span></sup>
+        </div>
         <br>
-        K = 10<sup><span id="kspan"></span></sup>
-        <br>
-        <input type="range" min="-2" max="2" step='.01' id="krange" style="width: 250px">
+        <input id="krange" max="2" min="-2" step='.01' style="width: 250px" type="range">
+        <p id="G_equation"></p>
     </div>
-
-    <p>
-    </p>
-
-    <div id="container">
-        <canvas id="input_canvas" height="500px" width="500px"></canvas>
-        <canvas id="output_canvas" height="500px" width="500px"></canvas>
-        <canvas id="rlocus_canvas" height="500px" width="500px"></canvas>
+    <div>
+        <h3>w-plane</h3>
+        <canvas height="500px" id="output_canvas" width="500px"></canvas>
+        <p>
+            The blue point s is mapped to the w-plane by the function KG(s).
+            Similarly, a contour is mapped to a plot.
+            Note that you can scale this plot by modifying K.
+        </p>
+        <p>
+            Use the following buttons to specify the interaction mode:
+        </p>
+        <p style="text-align: left">
+            <input id="radiobutton_zero" name="interactiontype" onclick="set_mode('zero')" type="radio">
+            <label for="radiobutton_zero">Orbit a zero</label><br>
+            <input id="radiobutton_pole" name="interactiontype" onclick="set_mode('pole')" type="radio">
+            <label for="radiobutton_pole">Orbit a pole</label><br>
+            <input id="radiobutton_nyquist" name="interactiontype" onclick="set_mode('nyquist')" type="radio">
+            <label for="radiobutton_nyquist">Nyquist contour</label><br>
+            <input checked id="radiobutton_interactive" name="interactiontype" onclick="set_mode('interactive')"
+                   type="radio">
+            <label for="radiobutton_interactive">Interactive</label><br>
+        </p>
     </div>
+    <div>
+        <h3>Root locus</h3>
+        <canvas height="500px" id="rlocus_canvas" width="500px"></canvas>
+        <p>
+            Shows the zeros of 1+KG(s) = 0 for every positive K.
+        </p>
+    </div>
+</div>
 
-    <h1>Handleiding</h1>
-    <ul>
-        <li>Linkermuisklik om een nulpunt toe te voegen / te verwijderen</li>
-        <li>Rechtermuisklik om een pool toe te voegen / te verwijderen</li>
+<br>
+<div id="credits" style="text-align: center">
+    Made by Bram Geelen @ ESAT - STADIUS.
+    <br>
+    Source code at <a href="https://gitlab.esat.kuleuven.be/Bram.Geelen/cauchy">gitlab.esat.kuleuven.be/Bram.Geelen/cauchy</a>
+    <br>
+    Uses
+    <a href="https://mathjs.org/">Math.js</a>,
+    <a href="https://github.com/infusion/Fraction.js/">fraction.js</a>
+    <a href="https://github.com/infusion/complex.js/">complex.js</a> and
+    <a href="https://github.com/infusion/polynomial.js/">polynomial.js</a> .
+</div>
 
-        <li>Sleep om het vlak te bewegen</li>
-        <li>Gebruik de interactieve modus om je eigen contour te tekenen</li>
-    </ul>
-    <script>
-        Polynomial.setField('C');
+<script>
+    Polynomial.setField('C');
 
-        const scale = 75;
+    const scale = 75;
 
-        const in_ctx = document.getElementById('input_canvas').getContext('2d');
-        const out_ctx = document.getElementById('output_canvas').getContext('2d');
-        const rl_ctx = document.getElementById('rlocus_canvas').getContext('2d');
-        const krange = document.getElementById('krange');
-        const kspan = document.getElementById('kspan');
+    const in_ctx = document.getElementById('input_canvas').getContext('2d');
+    const out_ctx = document.getElementById('output_canvas').getContext('2d');
+    const rl_ctx = document.getElementById('rlocus_canvas').getContext('2d');
+    const krange = document.getElementById('krange');
+    const kspan = document.getElementById('kspan');
 
-        in_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
-        out_ctx.translate(out_ctx.canvas.height / 2, out_ctx.canvas.height / 2);
-        rl_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
+    in_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
+    out_ctx.translate(out_ctx.canvas.height / 2, out_ctx.canvas.height / 2);
+    rl_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
 
-        let tail = [];
-        let tail_transformed = [];
-        let points_start_index = 30;
+    let tail = [];
+    let tail_transformed = [];
+    let points_start_index = 30;
 
-        let zeros = [Complex(-2)];
-        let poles = [Complex(-3, -2), Complex(-3, 2)];
-        let K = 1;
+    let zeros = [Complex(-2)];
+    let poles = [Complex(-3, -2), Complex(-3, 2)];
+    let K = 1;
 
-        function add_drag(ctx) {
-            ctx.canvas.addEventListener('mousedown', (event) => {
-                ctx.canvas.isdragging = true;
-            });
+    function add_drag(ctx) {
+        ctx.canvas.addEventListener('mousedown', (event) => {
+            ctx.canvas.isdragging = true;
+        });
 
-            const enddrag = () => ctx.canvas.isdragging = false;
+        const enddrag = () => ctx.canvas.isdragging = false;
 
-            ctx.canvas.addEventListener('mouseup', enddrag);
-            ctx.canvas.addEventListener('mouseout', enddrag);
+        ctx.canvas.addEventListener('mouseup', enddrag);
+        ctx.canvas.addEventListener('mouseout', enddrag);
 
-            ctx.canvas.addEventListener('mousemove', (event) => {
-                if (ctx.canvas.isdragging) {
-                    ctx.translate(event.movementX, event.movementY);
-                    requestAnimationFrame(redraw_in_out)
-                }
-            });
-        }
-
-        function add_zoom(ctx) {
-            ctx.canvas.addEventListener('wheel', (event) => {
-                console.log('wheel')
-                // event.preventDefault();
-
-            }, false);
-        }
-
-        function add_axes(ctx) {
-            const axes_length = 10;
-
-            ctx.font = '14px serif';
-
-            ctx.strokestyle = 'black';
-            ctx.lineWidth = 1;
-
-            ctx.beginPath();
-            ctx.moveTo(-1000 * scale, 0);
-            ctx.lineTo(+1000 * scale, 0);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(0, -1000);
-            ctx.lineTo(0, +1000);
-            ctx.stroke();
-
-            // labels
-            for (let i = -axes_length; i <= axes_length; i++) {
-                if (i === 0) {
-                    continue;
-                }
-
-                // x axis
-                ctx.beginPath();
-                ctx.moveTo(i * scale, 0);
-                ctx.lineTo(i * scale, 6);
-                ctx.stroke();
-
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'hanging';
-                ctx.fillText(`${i}`, i * scale, 10);
-
-                // y axis
-                ctx.beginPath();
-                ctx.moveTo(0, i * scale);
-                ctx.lineTo(-6, i * scale);
-                ctx.stroke();
-
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`${i}j`, -10, -i * scale);
+        ctx.canvas.addEventListener('mousemove', (event) => {
+            if (ctx.canvas.isdragging) {
+                ctx.translate(event.movementX, event.movementY);
+                requestAnimationFrame(redraw_in_out)
             }
+        });
+    }
+
+    function add_zoom(ctx) {
+        ctx.canvas.addEventListener('wheel', (event) => {
+            console.log('wheel')
+            // event.preventDefault();
+
+        }, false);
+    }
+
+    function add_axes(ctx) {
+        const axes_length = 10;
+
+        ctx.save()
+        ctx.font = '14px serif';
+
+        ctx.strokestyle = 'black';
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(-1000 * scale, 0);
+        ctx.lineTo(+1000 * scale, 0);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, -1000);
+        ctx.lineTo(0, +1000);
+        ctx.stroke();
+
+        // labels
+        for (let i = -axes_length; i <= axes_length; i++) {
+            if (i === 0) {
+                continue;
+            }
+
+            // x axis
+            ctx.beginPath();
+            ctx.moveTo(i * scale, 0);
+            ctx.lineTo(i * scale, 6);
+            ctx.stroke();
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'hanging';
+            ctx.fillText(`${i}`, i * scale, 10);
+
+            // y axis
+            ctx.beginPath();
+            ctx.moveTo(0, i * scale);
+            ctx.lineTo(-6, i * scale);
+            ctx.stroke();
 
             ctx.textAlign = 'right';
-            ctx.textBaseline = 'hanging';
-            ctx.fillText('0', -10, 10)
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${i}j`, -10, -i * scale);
         }
 
-        function headpoint(points) {
-            if (mode === 'interactive') {
-                return points[points.length - 1];
-            } else {
-                return points[(points_start_index - 1 + points.length) % points.length];
-            }
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'hanging';
+        ctx.fillText('0', -10, 10)
+
+        ctx.restore();
+    }
+
+    function headpoint(points) {
+        if (mode === 'interactive') {
+            return points[points.length - 1];
+        } else {
+            return points[(points_start_index - 1 + points.length) % points.length];
+        }
+    }
+
+    function draw_points(ctx, points) {
+        if (points.length === 0) {
+            return;
         }
 
-        function draw_points(ctx, points) {
-            if (points.length === 0) {
-                return;
-            }
+        var canvas_points = points.map(s => [s.re * scale, -s.im * scale]);
 
-            var canvas_points = points.map(s => [s.re * scale, -s.im * scale]);
-
-            if (window.mode === 'interactive') {
-                canvas_points = last_sqrt_items_of_list(canvas_points);
-            } else {
-                const i = points_start_index % canvas_points.length;
-                canvas_points = canvas_points.slice(i).concat(canvas_points.slice(0, i)).slice(Math.floor(canvas_points.length * .2));
-            }
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(...(canvas_points[0]));
-
-            ctx.strokeStyle = 'cyan';
-            canvas_points.forEach(point => {
-                ctx.lineTo(...point);
-            });
-
-            ctx.stroke();
-
-            const point = canvas_points[canvas_points.length - 1];
-            ctx.fillStyle = ctx.strokeStyle;
-            ctx.beginPath();
-            ctx.arc(point[0], point[1], 3, 0, 2 * Math.PI);
-            ctx.fill();
-
-            ctx.restore();
+        if (window.mode === 'interactive') {
+            canvas_points = last_sqrt_items_of_list(canvas_points);
+        } else {
+            const i = points_start_index % canvas_points.length;
+            canvas_points = canvas_points.slice(i).concat(canvas_points.slice(0, i)).slice(Math.floor(canvas_points.length * .2));
         }
 
-        function draw_in_phasors() {
-            if (tail.length === 0) {
-                return;
-            }
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(...(canvas_points[0]));
 
-            const s = headpoint(tail);
+        ctx.strokeStyle = 'cyan';
+        canvas_points.forEach(point => {
+            ctx.lineTo(...point);
+        });
 
-            in_ctx.save();
-            const r = 10;
-            in_ctx.strokeStyle = 'lightgrey';
-            poles.concat(zeros).forEach(c => {
-                in_ctx.beginPath();
-                in_ctx.moveTo(s.re * scale, -s.im * scale);
-                in_ctx.lineTo(c.re * scale, -c.im * scale);
-                in_ctx.stroke();
-            });
+        ctx.stroke();
 
-            in_ctx.strokeStyle = 'red';
-            poles.forEach(p => {
-                in_ctx.beginPath();
-                in_ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
-                in_ctx.stroke();
-            });
+        const point = canvas_points[canvas_points.length - 1];
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.beginPath();
+        ctx.arc(point[0], point[1], 3, 0, 2 * Math.PI);
+        ctx.fill();
 
-            in_ctx.strokeStyle = 'darkgreen';
-            zeros.forEach(z => {
-                in_ctx.beginPath();
-                in_ctx.arc(z.re * scale, -z.im * scale, r, -s.sub(z).arg(), 0);
-                in_ctx.stroke();
-            });
+        ctx.restore();
+    }
 
-            in_ctx.restore()
+    function draw_in_phasors() {
+        if (tail.length === 0) {
+            return;
         }
 
-        function draw_out_phasors() {
-            if (tail.length === 0) {
-                return;
-            }
-            let sum_phase = 0;
-            let r = 10;
+        const s = headpoint(tail);
 
-            const s = headpoint(tail);
-            out_ctx.save();
+        in_ctx.save();
+        const r = 10;
+        in_ctx.strokeStyle = 'lightgrey';
+        poles.concat(zeros).forEach(c => {
+            in_ctx.beginPath();
+            in_ctx.moveTo(s.re * scale, -s.im * scale);
+            in_ctx.lineTo(c.re * scale, -c.im * scale);
+            in_ctx.stroke();
+        });
 
-            out_ctx.strokeStyle = 'lightgrey';
-            const fs = headpoint(tail_transformed);
+        in_ctx.strokeStyle = 'red';
+        poles.forEach(p => {
+            in_ctx.beginPath();
+            in_ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
+            in_ctx.stroke();
+        });
 
+        in_ctx.strokeStyle = 'darkgreen';
+        zeros.forEach(z => {
+            in_ctx.beginPath();
+            in_ctx.arc(z.re * scale, -z.im * scale, r, -s.sub(z).arg(), 0);
+            in_ctx.stroke();
+        });
+
+        in_ctx.restore()
+    }
+
+    function draw_out_phasors() {
+        if (tail.length === 0) {
+            return;
+        }
+        let sum_phase = 0;
+        let r = 10;
+
+        const s = headpoint(tail);
+        out_ctx.save();
+
+        out_ctx.strokeStyle = 'lightgrey';
+        const fs = headpoint(tail_transformed);
+
+        out_ctx.beginPath();
+        out_ctx.moveTo(0, 0);
+        out_ctx.lineTo(fs.re * scale, -fs.im * scale);
+        out_ctx.stroke();
+
+        out_ctx.strokeStyle = 'darkgreen';
+
+        zeros.forEach(z => {
             out_ctx.beginPath();
-            out_ctx.moveTo(0, 0);
-            out_ctx.lineTo(fs.re * scale, -fs.im * scale);
+            let phase = -s.sub(z).arg();
+            out_ctx.arc(0, 0, r, phase + sum_phase, sum_phase);
+            sum_phase += phase;
+            r += 5;
             out_ctx.stroke();
+        });
 
-            out_ctx.strokeStyle = 'darkgreen';
+        out_ctx.strokeStyle = 'red';
+        poles.forEach(p => {
+            out_ctx.beginPath();
+            let phase = s.sub(p).arg();
+            out_ctx.arc(0, 0, r, sum_phase, phase + sum_phase);
+            sum_phase += phase;
+            r += 5;
+            out_ctx.stroke();
+        });
 
-            zeros.forEach(z => {
-                out_ctx.beginPath();
-                let phase = -s.sub(z).arg();
-                out_ctx.arc(0, 0, r, phase + sum_phase, sum_phase);
-                sum_phase += phase;
-                r += 5;
-                out_ctx.stroke();
-            });
+        out_ctx.restore()
+    }
 
-            out_ctx.strokeStyle = 'red';
-            poles.forEach(p => {
-                out_ctx.beginPath();
-                let phase = s.sub(p).arg();
-                out_ctx.arc(0, 0, r, sum_phase, phase + sum_phase);
-                sum_phase += phase;
-                r += 5;
-                out_ctx.stroke();
-            });
+    function draw_poles(ctx) {
+        const size = 3;
+        ctx.save();
+        ctx.strokeStyle = 'blue';
+        poles.forEach(p => {
+            ctx.beginPath();
+            ctx.moveTo(p.re * scale - size, -(p.im * scale - size));
+            ctx.lineTo(p.re * scale + size, -(p.im * scale + size));
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(p.re * scale - size, -(p.im * scale + size));
+            ctx.lineTo(p.re * scale + size, -(p.im * scale - size));
+            ctx.stroke();
+        });
 
-            out_ctx.restore()
+        ctx.restore();
+    }
+
+    function draw_zeros(ctx) {
+        const r = 5;
+        ctx.save();
+        ctx.strokeStyle = 'blue';
+        zeros.forEach(p => {
+            ctx.beginPath();
+            // ctx.moveTo(p.re * scale, -(p.im * scale));
+            ctx.arc(p.re * scale, -(p.im * scale), r, 0, Math.PI * 2);
+            ctx.stroke();
+        });
+
+        ctx.restore();
+    }
+
+    const mul = (a, b) => a.mul(b);
+    const div = (a, b) => a.div(b);
+
+    function make_function() {
+        return s => {
+            s = Complex(s);
+            const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
+            const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
+            return counter.mul(K).div(denominator);
+        }
+    }
+
+    function last_sqrt_items_of_list(l) {
+        const n = l.length;
+        return l.slice(Math.floor(n - Math.sqrt(n)));
+    }
+
+    function redraw_in() {
+        in_ctx.clearRect(-1000, -1000, 2000, 2000);
+        add_axes(in_ctx);
+
+        draw_points(in_ctx, tail);
+
+        draw_in_phasors();
+
+        draw_poles(in_ctx);
+        draw_zeros(in_ctx);
+    }
+
+    function redraw_out() {
+        out_ctx.clearRect(-1000, -1000, 2000, 2000);
+        add_axes(out_ctx);
+
+        draw_points(out_ctx, tail_transformed);
+
+        draw_out_phasors();
+    }
+
+    function complex_rand() {
+        return Complex(math.random() - .5, math.random() - .5);
+    }
+
+    const n_ks = 10000;
+    const max_exponent = 3;
+
+    const ks = Array(n_ks).fill().map((_, i) => Math.pow(10, (i / (n_ks - 1) - .5) * 2 * max_exponent))
+
+
+    function calculate_roots(poly, est) {
+        let roots = [];
+        poly = poly.monic();
+        while (poly.coeff[0].abs() === 0) {
+            roots.push(Complex.ZERO);
+            poly = poly.div('x').monic();
         }
 
-        function draw_poles(ctx) {
-            const size = 3;
-            ctx.save();
-            ctx.strokeStyle = 'blue';
-            poles.forEach(p => {
-                ctx.beginPath();
-                ctx.moveTo(p.re * scale - size, -(p.im * scale - size));
-                ctx.lineTo(p.re * scale + size, -(p.im * scale + size));
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(p.re * scale - size, -(p.im * scale + size));
-                ctx.lineTo(p.re * scale + size, -(p.im * scale - size));
-                ctx.stroke();
-            });
-
-            ctx.restore();
+        if (est === undefined) {
+            est = Array(poly.degree()).fill().map(complex_rand)
         }
 
-        function draw_zeros(ctx) {
-            const r = 5;
-            ctx.save();
-            ctx.strokeStyle = 'blue';
-            zeros.forEach(p => {
-                ctx.beginPath();
-                // ctx.moveTo(p.re * scale, -(p.im * scale));
-                ctx.arc(p.re * scale, -(p.im * scale), r, 0, Math.PI * 2 );
-                ctx.stroke();
-            });
+        poly.complexRoots(est).root.forEach(root => roots.push(root));
 
-            ctx.restore();
+        return roots
+    }
+
+    let last_calculated_poly = '';
+    let root_lines = [];
+
+    function recalculate_root_lines() {
+        // 1 + KP = 0
+        // P = counter / denominator
+        // denominator + K counter = 0
+
+        const counter = Polynomial.fromRoots(zeros);
+        const denominator = Polynomial.fromRoots(poles);
+
+        const poly_1 = counter.add(denominator); // K = 1
+
+        if (poly_1.toString() === last_calculated_poly) {
+            console.log('using cached root lines');
+            return;
+        }
+        console.log('calculating root lines')
+
+        last_calculated_poly = poly_1.toString();
+
+        const roots_per_K = [];
+        roots_per_K.push(calculate_roots(counter.mul(ks[0]).add(denominator)));
+
+        for (let i = 1; i < n_ks; i++) {
+            roots_per_K.push(calculate_roots(
+                counter.mul(ks[i]).add(denominator),
+                roots_per_K[i - 1]
+            ));
         }
 
-        const mul = (a, b) => a.mul(b);
-        const div = (a, b) => a.div(b);
+        root_lines = roots_per_K[0].map(() => []);
+        roots_per_K.forEach(roots =>
+            roots.forEach((root, i) =>
+                root_lines[i].push(root)));
+    }
 
-        function make_function() {
-            return s => {
-                s = Complex(s);
-                const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
-                const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
-                return counter.mul(K).div(denominator);
-            }
-        }
+    function draw_root_lines() {
+        rl_ctx.save();
+        rl_ctx.strokeStyle = 'blue';
+        rl_ctx.lineWidth = 2;
 
-        function last_sqrt_items_of_list(l) {
-            const n = l.length;
-            return l.slice(Math.floor(n - Math.sqrt(n)));
-        }
+        root_lines.forEach(root_line => {
+            const points = root_line.map(s => s.mul(scale).toVector());
 
-        function redraw_in() {
-            in_ctx.clearRect(-1000, -1000, 2000, 2000);
-            add_axes(in_ctx);
+            if (true) {
+                // draw line
+                rl_ctx.beginPath();
+                rl_ctx.moveTo(...(points[0]));
+                points.forEach(point => {
+                    rl_ctx.lineTo(...point);
+                });
 
-            draw_points(in_ctx, tail);
-
-            draw_in_phasors();
-
-            draw_poles(in_ctx);
-            draw_zeros(in_ctx);
-        }
-
-        function redraw_out() {
-            out_ctx.clearRect(-1000, -1000, 2000, 2000);
-            add_axes(out_ctx);
-
-            draw_points(out_ctx, tail_transformed);
-
-            draw_out_phasors();
-        }
-
-        const n_ks = 10000;
-        const max_exponent = 3;
-
-        const ks = Array(n_ks).fill().map((_, i) => Math.pow(10, (i / (n_ks - 1) - .5) * 2 * max_exponent))
-
-        function calculate_roots(poly, est) {
-            var roots = [];
-            poly = poly.monic();
-            while (poly.coeff[0].abs() === 0) {
-                roots.push(Complex.ZERO);
-                poly = poly.div('x').monic();
-            }
-
-            const complex_rand = () => Complex(math.random() - .5, math.random() - .5)
-
-            if (est === undefined) {
-                est = Array(poly.degree()).fill().map(complex_rand)
-            }
-
-            poly.complexRoots(est).root.forEach(root => roots.push(root));
-
-            return roots
-        }
-
-        var last_calculated_poly = '';
-        var root_lines = [];
-
-        function recalculate_root_lines() {
-            // 1 + KP = 0
-            // P = counter / denominator
-            // denominator + K counter = 0
-
-            const counter = Polynomial.fromRoots(zeros);
-            const denominator = Polynomial.fromRoots(poles);
-
-            const poly_1 = counter.add(denominator); // K = 1
-
-            if (poly_1.toString() === last_calculated_poly) {
-                console.log('using cached root lines');
-                return;
-            }
-
-            last_calculated_poly = poly_1.toString();
-
-            const roots_per_K = [];
-            roots_per_K.push(calculate_roots(counter.mul(ks[0]).add(denominator)));
-
-            for (let i = 1; i < n_ks; i++) {
-                roots_per_K.push(calculate_roots(
-                    counter.mul(ks[i]).add(denominator),
-                    roots_per_K[i-1]
-                ));
-            }
-
-            root_lines = roots_per_K[0].map(() => []);
-            roots_per_K.forEach(roots =>
-                roots.forEach((root, i) =>
-                    root_lines[i].push(root)));
-        }
-
-        function draw_root_lines() {
-            rl_ctx.save();
-            rl_ctx.strokeStyle = 'blue';
-            rl_ctx.lineWidth=2;
-
-            root_lines.forEach(root_line => {
-                const points = root_line.map(s => s.mul(scale).toVector());
-
-                if (true){
+                rl_ctx.stroke();
+            } else {
+                // Draw points
+                points.forEach(point => {
+                    rl_ctx.fillStyle = rl_ctx.strokeStyle;
                     rl_ctx.beginPath();
-                    rl_ctx.moveTo(...(points[0]));
-                    points.forEach(point => {
-                        rl_ctx.lineTo(...point);
-                    });
+                    rl_ctx.arc(point[0], point[1], 2, 0, 2 * Math.PI);
+                    rl_ctx.fill();
+                });
+            }
+        });
+        rl_ctx.restore();
+    }
 
-                    rl_ctx.stroke();
-                } else {
-                    points.forEach(point => {
-                        rl_ctx.fillStyle = rl_ctx.strokeStyle;
-                        rl_ctx.beginPath();
-                        rl_ctx.arc(point[0], point[1], 2, 0, 2 * Math.PI);
-                        rl_ctx.fill();
-                    })
-                }
-            });
+    function draw_closed_loop_poles() {
+        console.log('calculating closed loop poles for a single K...')
+        // 1 + KP = 0
+        // P = counter / denominator
+        // denominator + K counter = 0
+
+        const counter = Polynomial.fromRoots(zeros);
+        const denominator = Polynomial.fromRoots(poles);
+
+        const poly = counter.mul(K).add(denominator).monic();
+
+        let est = Array(poly.degree()).fill().map(complex_rand);
+        const found_roots = poly.complexRoots(est).root;
+
+        found_roots.forEach(root => {
+            let [x, y] = root.mul(scale).toVector();
+
+            rl_ctx.save();
+            // rl_ctx.strokeStyle = 'black';
+            rl_ctx.lineWidth = 2;
+
+            let d = .1 * scale;
+
+            rl_ctx.beginPath();
+            rl_ctx.moveTo(x - d, y);
+            rl_ctx.lineTo(x + d, y);
+            rl_ctx.stroke();
+
+            rl_ctx.beginPath();
+            rl_ctx.moveTo(x, y - d);
+            rl_ctx.lineTo(x, y + d);
+            rl_ctx.stroke();
+
             rl_ctx.restore();
-        }
-
-        function draw_closed_loop_poles() {
-
-        }
-
-        function redraw_rl() {
-            rl_ctx.clearRect(-1000, -1000, 2000, 2000);
-            add_axes(rl_ctx);
-
-            draw_root_lines();
-            draw_closed_loop_poles();
-
-            draw_poles(rl_ctx);
-            draw_zeros(rl_ctx);
-        }
-
-        function redraw_in_out() {
-            redraw_in();
-            redraw_out();
-        }
-
-        function redraw_all() {
-            redraw_in();
-            redraw_out();
-            redraw_rl();
-        }
-
-        function round_point(c) {
-            const round = num => Math.round( num * 10 + Number.EPSILON ) / 10;
-            return Complex(
-                round(c.re),
-                round(c.im)
-            )
-        }
-
-        function coor_for_event(event, ctx) {
-            const rect = ctx.canvas.getBoundingClientRect();
-            const point_unscaled = (ctx
-                    .getTransform()
-                    .inverse()
-                    .transformPoint({
-                        x: event.clientX - rect.left,
-                        y: event.clientY - rect.top
-                    })
-            );
-
-            return Complex(
-                point_unscaled.x / scale,
-                -point_unscaled.y / scale
-            )
-        }
-
-        function circle_around(p) {
-            const n = 1000;
-            return [...Array(n).keys()].reverse().map(v => p.add({arg: ((v / n) * 2 * Math.PI), abs: 0.8}));
-        }
-
-        function nyquist_contour() {
-            const n = 1000;
-            const omega_js = [...Array(n).keys()].map(o => (o + 1) / 10).map(o => Complex.I.mul(o));
-            return omega_js.concat([Complex(1000)], omega_js.map(oj => oj.conjugate()).reverse(), [Complex.ZERO]);
-        }
-
-        function start_animation() {
-            if (window.mode === 'interactive') {
-                return;
-            }
-            requestAnimationFrame(redraw_in_out);;
-
-            points_start_index += 1;
-            setTimeout(start_animation, 5);
-        }
-
-        function set_mode(new_mode) {
-            const was_already_animating = window.mode !== 'interactive';
-
-            window.mode = new_mode;
-
-            if (new_mode === 'interactive') {
-                tail = [];
-                tail_transformed = [];
-            } else if (new_mode === 'zero') {
-                tail = circle_around(zeros[math.randomInt(zeros.length)]);
-                tail_transformed = tail.map(make_function());
-            } else if (new_mode === 'pole') {
-                tail = circle_around(poles[math.randomInt(poles.length)]);
-                tail_transformed = tail.map(make_function());
-            } else if (new_mode === 'nyquist') {
-                tail = nyquist_contour();
-                tail_transformed = tail.map(make_function());
-            }
-
-            if (!was_already_animating) {
-                start_animation();
-            }
-        }
-
-        add_drag(in_ctx);
-        add_drag(out_ctx);
-
-        mode = 'interactive';
-
-        in_ctx.canvas.addEventListener('mousemove', (event) => {
-            if (mode === 'interactive') {
-                const coor = coor_for_event(event, in_ctx);
-                tail.push(coor);
-                tail_transformed.push(make_function()(coor));
-
-                requestAnimationFrame(redraw_in_out);
-            }
         });
 
-        in_ctx.canvas.addEventListener('click', (event) => {
-            let clicked = coor_for_event(event, in_ctx);
-            clicked.im = math.abs(clicked.im);
+    }
 
-            const l = zeros.length;
-            // remove zeros that are close to click
-            zeros = zeros.filter(z => clicked.sub(Complex(z.re, math.abs(z.im))).abs() > .2);
+    function redraw_rl() {
+        rl_ctx.clearRect(-1000, -1000, 2000, 2000);
+        add_axes(rl_ctx);
 
-            if (zeros.length === l){
-                // if no zeros were removed
-                clicked = round_point(clicked);
-                zeros.push(clicked);
-                if (clicked.im !== 0) {
-                    zeros.push(clicked.conjugate())
-                }
-            }
+        draw_root_lines();
+        draw_closed_loop_poles();
 
+        draw_poles(rl_ctx);
+        draw_zeros(rl_ctx);
+    }
+
+    function redraw_in_out() {
+        redraw_in();
+        redraw_out();
+    }
+
+    function redraw_all() {
+        redraw_in();
+        redraw_out();
+        redraw_rl();
+    }
+
+    function round_point(c) {
+        return Complex(
+            round_n(c.re, 1),
+            round_n(c.im, 1)
+        )
+    }
+
+    /**
+     * Round to n decimals after point
+     * @param x
+     * @param n decimals
+     * @returns {number}
+     */
+    function round_n(x, n) {
+        p = Math.pow(10, n);
+        return Math.round(x * p) / p
+    }
+
+    function coor_for_event(event, ctx) {
+        const rect = ctx.canvas.getBoundingClientRect();
+        const point_unscaled = (ctx
+                .getTransform()
+                .inverse()
+                .transformPoint({
+                    x: event.clientX - rect.left,
+                    y: event.clientY - rect.top
+                })
+        );
+
+        return Complex(
+            point_unscaled.x / scale,
+            -point_unscaled.y / scale
+        )
+    }
+
+    function circle_around(p) {
+        const n = 1000;
+        return [...Array(n).keys()].reverse().map(v => p.add({arg: ((v / n) * 2 * Math.PI), abs: 0.8}));
+    }
+
+    function nyquist_contour() {
+        const n = 1000;
+        const omega_js = [...Array(n).keys()].map(o => (o + 1) / 10).map(o => Complex.I.mul(o));
+        return omega_js.concat([Complex(1000)], omega_js.map(oj => oj.conjugate()).reverse(), [Complex.ZERO]);
+    }
+
+    function start_animation() {
+        if (window.mode === 'interactive') {
+            return;
+        }
+        requestAnimationFrame(redraw_in_out);
+        ;
+
+        points_start_index += 1;
+        setTimeout(start_animation, 5);
+    }
+
+    function set_mode(new_mode) {
+        const was_already_animating = window.mode !== 'interactive';
+
+        window.mode = new_mode;
+
+        if (new_mode === 'interactive') {
+            tail = [];
+            tail_transformed = [];
+        } else if (new_mode === 'zero') {
+            tail = circle_around(zeros[math.randomInt(zeros.length)]);
             tail_transformed = tail.map(make_function());
-            recalculate_root_lines();
-            requestAnimationFrame(redraw_all);
-            event.preventDefault();
-        });
-
-        in_ctx.canvas.addEventListener('contextmenu', (event) => {
-            var clicked = coor_for_event(event, in_ctx);
-            clicked.im = math.abs(clicked.im);
-
-            const l = poles.length;
-            // remove poles that are close to click
-            poles = poles.filter(z => clicked.sub(Complex(z.re, math.abs(z.im))).abs() > .2);
-
-            if (poles.length === l){
-                // if no poles were removed
-                clicked = round_point(clicked);
-                poles.push(clicked);
-                if (clicked.im !== 0) {
-                    poles.push(clicked.conjugate())
-                }
-            }
-
+        } else if (new_mode === 'pole') {
+            tail = circle_around(poles[math.randomInt(poles.length)]);
             tail_transformed = tail.map(make_function());
-            recalculate_root_lines();
-            requestAnimationFrame(redraw_all);
-            event.preventDefault();
-        }, false);
-
-
-        function kchanged() {
-            K = Math.pow(10, krange.value);
-            kspan.innerText = krange.value;
-
+        } else if (new_mode === 'nyquist') {
+            tail = nyquist_contour();
             tail_transformed = tail.map(make_function());
-            redraw_out();
         }
 
-        krange.addEventListener('input', kchanged);
+        if (!was_already_animating) {
+            start_animation();
+        }
+    }
+
+    add_drag(in_ctx);
+    add_drag(out_ctx);
+
+    mode = 'interactive';
+
+    in_ctx.canvas.addEventListener('mousemove', (event) => {
+        if (mode === 'interactive') {
+            const coor = coor_for_event(event, in_ctx);
+            tail.push(coor);
+            tail_transformed.push(make_function()(coor));
+
+            requestAnimationFrame(redraw_in_out);
+        }
+    });
+
+    in_ctx.canvas.addEventListener('click', (event) => {
+        let clicked = coor_for_event(event, in_ctx);
+        clicked.im = math.abs(clicked.im);
+
+        const l = zeros.length;
+        // remove zeros that are close to click
+        zeros = zeros.filter(z => clicked.sub(Complex(z.re, math.abs(z.im))).abs() > .2);
+
+        if (zeros.length === l) {
+            // if no zeros were removed
+            clicked = round_point(clicked);
+            zeros.push(clicked);
+            if (clicked.im !== 0) {
+                zeros.push(clicked.conjugate())
+            }
+        }
+
+        tail_transformed = tail.map(make_function());
         recalculate_root_lines();
-        kchanged();
         requestAnimationFrame(redraw_all);
+        update_G_description();
+        event.preventDefault();
+    });
 
-    </script>
+    in_ctx.canvas.addEventListener('contextmenu', (event) => {
+        var clicked = coor_for_event(event, in_ctx);
+        clicked.im = math.abs(clicked.im);
+
+        const l = poles.length;
+        // remove poles that are close to click
+        poles = poles.filter(z => clicked.sub(Complex(z.re, math.abs(z.im))).abs() > .2);
+
+        if (poles.length === l) {
+            // if no poles were removed
+            clicked = round_point(clicked);
+            poles.push(clicked);
+            if (clicked.im !== 0) {
+                poles.push(clicked.conjugate())
+            }
+        }
+
+        tail_transformed = tail.map(make_function());
+        recalculate_root_lines();
+        requestAnimationFrame(redraw_all);
+        update_G_description();
+        event.preventDefault();
+    }, false);
+
+    function roots_to_html(roots) {
+        const complex_to_str = c => (c.re < 0 || (c.re == 0 && c.im < 0)) ? c.toString() : ('+' + c.toString());
+        const complex_to_s_minus = c => Complex.ZERO.equals(c) ? 's' : '(s' + complex_to_str(Complex(0).sub(c)) + ')';
+        const add_spacing = s => s.replaceAll('i', 'j').replaceAll('+', '&nbsp+&nbsp').replaceAll('-', '&nbsp-&nbsp');
+
+        // TODO : powers for double roots?
+
+        let html = roots.map(complex_to_s_minus).map(add_spacing).join('&nbsp;');
+
+        if (roots.length == 1) {
+            html = html.substr(1, html.length - 2)
+        }
+
+        return html
+    }
+
+    function roots_to_html_poly(roots) {
+        const poly = Polynomial.fromRoots(roots);
+        const coeffs = poly.monic().coeff;
+
+        const s_pow = (pow) => pow == 0 ? '' : pow == 1 ? 's' : `s<sup>${pow}</sup>`;
+
+        return Object.entries(coeffs).reverse().map(([pow, coeff], i) =>
+            `${coeff == 1 ? '' : round_n(coeff, 3)}${s_pow(pow)}`
+        ).join('&nbsp;+&nbsp;').replaceAll('+&nbsp;-', '-&nbsp;').replaceAll('i', 'j');
+    }
+
+    function update_G_description() {
+        let counter_roots = roots_to_html(zeros);
+        let counter_polynomic = roots_to_html_poly(zeros);
+        let denominator_roots = roots_to_html(poles);
+        let denominator_polynomic = roots_to_html_poly(poles);
+
+        let K_str = K === 1 ? '' : String(round_n(K, 2));
+
+        let table = [
+            '<table class="equationtable"><tr>' +
+            '<td rowspan="2">KG(s)</td>' +
+            '<td rowspan="2">=&nbsp;' + K_str + ' </td>' +
+            `<td class="counter">&nbsp;${counter_roots}&nbsp;</td>` +
+            '</tr>' +
+            '<tr>' +
+            `<td>&nbsp;${denominator_roots}&nbsp;</td>` +
+            '</tr>' +
+            '<tr style="height: 2ch"></tr>' +
+            '<tr>' +
+            '<td rowspan="2"></td>' +
+            '<td rowspan="2">&nbsp;=&nbsp;' + K_str + ' </td>' +
+            `<td class="counter">&nbsp;${counter_polynomic}&nbsp;</td>` +
+            '</tr>' +
+            '<tr>' +
+            `<td>&nbsp;${denominator_polynomic}&nbsp;</td>` +
+            '</tr>' +
+            '</table>'
+        ];
+
+
+        document.getElementById('G_equation').innerHTML = table.join('')
+    }
+
+    function k_changed() {
+        K = Math.pow(10, krange.value);
+        kspan.innerText = krange.value;
+
+        tail_transformed = tail.map(make_function());
+        redraw_out();
+        redraw_rl();
+        update_G_description();
+    }
+
+    krange.addEventListener('input', k_changed);
+    recalculate_root_lines();
+    k_changed(); // calls update_G_description
+    requestAnimationFrame(redraw_all);
+
+
+</script>
 </body>
 
 <!--
 TODO:
-- polen en nulpunten toevoegen en verwijderen: complex toegevoegde ook toevoegen
-- slepen -> rlocus ook slepen
-- titels / layout
-    - titel bovenaan
-    - handleiding boven plots
-    - wat zijn de polen en nulpunten?
-    - op welk punt staat de muis?
-    - transferfunctie KG
-    - made by/credits
+- op welk punt staat de muis?
 - bode plot?
-- bug nyquist contour
 -->
 </html>
