@@ -105,8 +105,8 @@
     <p>
         Shows the zeros of 1+KG(s) = 0 for every positive K.
         <br>
-        <button onclick="increase_rl_range()">Enlarge range of Ks</button>
-        <button onclick="increase_rl_resolution()">Increase resolution of Ks</button>
+        <button onclick="RL.increase_K_range()">Enlarge range of Ks</button>
+        <button onclick="RL.increase_K_resolution()">Increase resolution of Ks</button>
     </p>
 </div>
 
@@ -135,7 +135,7 @@
 
     let contour = [];
     let plot = [];
-    let points_start_index = 30;
+    let headpoint_index = 0;
 
     const zeros = [Complex(-2)];
     const poles = [Complex(-1, 1), Complex(-1, -1)];
@@ -153,13 +153,11 @@
 
         ctx.canvas.addEventListener('mousemove', (event) => {
             if (event.buttons) {
-                console.log(ctx === in_ctx,  ctx === rl_ctx);
                 if (ctx === in_ctx || ctx === rl_ctx) {
                     in_ctx.translate(event.movementX, event.movementY);
                     rl_ctx.translate(event.movementX, event.movementY);
                     requestAnimationFrame(redraw_in);
-                    requestAnimationFrame(redraw_rl);
-
+                    requestAnimationFrame(RL.redraw);
                 } else {
                     // (ctx === out_ctx)
                     ctx.translate(event.movementX, event.movementY);
@@ -232,7 +230,7 @@
         if (mode === 'interactive') {
             return points[points.length - 1];
         } else {
-            return points[(points_start_index - 1 + points.length) % points.length];
+            return points[headpoint_index % points.length];
         }
     }
 
@@ -260,7 +258,7 @@
 
         ctx.stroke();
 
-        const point = points[points_start_index % points.length];
+        const point = points[headpoint_index % points.length];
         ctx.fillStyle = ctx.strokeStyle;
         ctx.beginPath();
         ctx.arc(point[0], point[1], 3, 0, 2 * Math.PI);
@@ -405,163 +403,140 @@
         return Complex(math.random() - .5, math.random() - .5);
     }
 
-    let n_ks = 3000;
-    let max_exponent = 2;
-
-    function increase_rl_resolution() {
-        n_ks *= 2;
-        force_recalculate_root_lines();
-        redraw_rl();
-    }
-
-    function increase_rl_range() {
-        max_exponent += 1;
-        force_recalculate_root_lines();
-        redraw_rl();
-    }
-
-    let last_calculated_poly = '';
-    let root_lines = [];
-
-    function recalculate_root_lines() {
-        // 1 + KP = 0
-        // P = counter / denominator
-        // denominator + K counter = 0
-
-        const counter = Polynomial.fromRoots(zeros);
-        const denominator = Polynomial.fromRoots(poles);
-
-        const poly_1 = counter.add(denominator); // K = 1
-
-        if (poly_1.toString() === last_calculated_poly) {
-            console.log('using cached root lines');
-            return;
-        }
-        console.log('calculating root lines');
-        last_calculated_poly = poly_1.toString();
-
-        force_recalculate_root_lines();
-    }
-
-    function force_recalculate_root_lines() {
-        const counter = Polynomial.fromRoots(zeros);
-        const denominator = Polynomial.fromRoots(poles);
-
-        const ks = Array(n_ks).fill(0).map((_, i) =>
-            Math.pow(10, (i / (n_ks - 1) - .5) * 2 * max_exponent));
-
-        const calculate_roots = (poly, est) => {
-            let roots = [];
-            poly = poly.monic();
-            while (poly.coeff[0].abs() === 0) {
-                roots.push(Complex.ZERO);
-                poly = poly.div('x').monic();
-            }
-
-            if (est === undefined) {
-                est = Array(poly.degree()).fill().map(complex_rand)
-            }
-
-            poly.complexRoots(est).root.forEach(root => roots.push(root));
-
-            return roots
-        };
-
-        const roots_per_K = [];
-        roots_per_K.push(calculate_roots(counter.mul(ks[0]).add(denominator)));
-
-        for (let i = 1; i < n_ks; i++) {
-            let estimated_roots = roots_per_K[i - 1];
-            roots_per_K.push(calculate_roots(
-                counter.mul(ks[i]).add(denominator),
-                estimated_roots
-            ));
+    class RootLocus {
+        constructor(ctx) {
+            this.ctx = ctx;
+            this.n_ks = 3000;
+            this.max_exponent = 2;
+            this.root_lines = [];
         }
 
-        root_lines = roots_per_K[0].map(() => []);
-        roots_per_K.forEach(roots =>
-            roots.forEach((root, i) =>
-                root_lines[i].push(root)));
-    }
+        increase_K_resolution() {
+            this.n_ks *= 2;
+            this.recalculate_root_lines();
+        }
 
-    function draw_root_lines() {
-        rl_ctx.save();
-        rl_ctx.strokeStyle = 'blue';
-        rl_ctx.lineWidth = 2;
+        increase_K_range() {
+            this.max_exponent += 1;
+            this.recalculate_root_lines();
+        }
 
-        root_lines.forEach(root_line => {
-            const points = root_line.map(s => s.mul(scale).toVector());
+        recalculate_root_lines() {
+            // 1 + KP = 0
+            // P = counter / denominator
+            // denominator + K counter = 0
+            console.log('calculating root lines');
 
-            if (true) {
-                // draw line
-                rl_ctx.beginPath();
-                rl_ctx.moveTo(...(points[0]));
-                points.forEach(point => {
-                    rl_ctx.lineTo(...point);
-                });
+            const counter = Polynomial.fromRoots(zeros);
+            const denominator = Polynomial.fromRoots(poles);
 
-                rl_ctx.stroke();
-            } else {
-                // Draw points
-                points.forEach(point => {
-                    rl_ctx.fillStyle = rl_ctx.strokeStyle;
-                    rl_ctx.beginPath();
-                    rl_ctx.arc(point[0], point[1], 2, 0, 2 * Math.PI);
-                    rl_ctx.fill();
-                });
+            const ks = math.range(0, this.n_ks + 1).toArray()
+                .map(i => Math.pow(10, (i / this.n_ks - .5) * 2 * this.max_exponent));
+
+            const calculate_roots = (poly, est) => {
+                let roots = [];
+                poly = poly.monic();
+                while (poly.coeff[0].abs() === 0) {
+                    roots.push(Complex.ZERO);
+                    poly = poly.div('x').monic();
+                }
+
+                if (est === undefined) {
+                    est = Array(poly.degree()).fill().map(complex_rand)
+                }
+
+                poly.complexRoots(est).root.forEach(root => roots.push(root));
+
+                return roots
+            };
+
+            const roots_per_K = [calculate_roots(counter.mul(ks[0]).add(denominator))];
+
+            for (let i = 1; i < this.n_ks; i++) {
+                let estimated_roots = roots_per_K[i - 1];
+                roots_per_K.push(calculate_roots(
+                    counter.mul(ks[i]).add(denominator),
+                    estimated_roots
+                ));
             }
-        });
-        rl_ctx.restore();
+
+            this.root_lines = roots_per_K[0].map(() => []);
+            roots_per_K.forEach(roots =>
+                roots.forEach((root, i) =>
+                    this.root_lines[i].push(root)));
+
+            requestAnimationFrame(this.redraw);
+        }
+
+        redraw() {
+            const draw_closed_loop_poles = () => {
+                const ctx = this.ctx;
+                console.log('calculating closed loop poles for a single K...')
+                // 1 + KP = 0
+                // P = counter / denominator
+                // denominator + K counter = 0
+
+                const counter = Polynomial.fromRoots(zeros);
+                const denominator = Polynomial.fromRoots(poles);
+
+                const poly = counter.mul(K).add(denominator).monic();
+
+                const est = Array(poly.degree()).fill(0).map(complex_rand);
+                poly.complexRoots(est).root.forEach(root => {
+                    let [x, y] = root.mul(scale).toVector();
+
+                    ctx.save();
+                    // ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 2;
+
+                    let d = .1 * scale;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x - d, y);
+                    ctx.lineTo(x + d, y);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(x, y - d);
+                    ctx.lineTo(x, y + d);
+                    ctx.stroke();
+
+                    ctx.restore();
+                });
+
+            };
+            const draw_root_lines = () => {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 2;
+
+                this.root_lines.forEach(root_line => {
+                    const points = root_line.map(s => s.mul(scale).toVector());
+
+                    ctx.beginPath();
+                    ctx.moveTo(...(points[0]));
+                    points.forEach(point => {
+                        ctx.lineTo(...point);
+                    });
+
+                    ctx.stroke();
+
+                });
+                ctx.restore();
+            };
+            this.ctx.clearRect(-1000, -1000, 2000, 2000);
+            add_axes(this.ctx);
+
+            draw_root_lines();
+            draw_closed_loop_poles();
+
+            draw_poles(this.ctx);
+            draw_zeros(this.ctx);
+        }
     }
 
-    function draw_closed_loop_poles() {
-        console.log('calculating closed loop poles for a single K...')
-        // 1 + KP = 0
-        // P = counter / denominator
-        // denominator + K counter = 0
-
-        const counter = Polynomial.fromRoots(zeros);
-        const denominator = Polynomial.fromRoots(poles);
-
-        const poly = counter.mul(K).add(denominator).monic();
-
-        let est = Array(poly.degree()).fill().map(complex_rand);
-        const found_roots = poly.complexRoots(est).root;
-
-        found_roots.forEach(root => {
-            let [x, y] = root.mul(scale).toVector();
-
-            rl_ctx.save();
-            // rl_ctx.strokeStyle = 'black';
-            rl_ctx.lineWidth = 2;
-
-            let d = .1 * scale;
-
-            rl_ctx.beginPath();
-            rl_ctx.moveTo(x - d, y);
-            rl_ctx.lineTo(x + d, y);
-            rl_ctx.stroke();
-
-            rl_ctx.beginPath();
-            rl_ctx.moveTo(x, y - d);
-            rl_ctx.lineTo(x, y + d);
-            rl_ctx.stroke();
-
-            rl_ctx.restore();
-        });
-
-    }
-
-    function redraw_rl() {
-        rl_ctx.clearRect(-1000, -1000, 2000, 2000);
-        add_axes(rl_ctx);
-
-        draw_root_lines();
-        draw_closed_loop_poles();
-
-        draw_poles(rl_ctx);
-        draw_zeros(rl_ctx);
-    }
+    RL = new RootLocus(rl_ctx);
 
     function redraw_in_out() {
         redraw_in();
@@ -571,14 +546,7 @@
     function redraw_all() {
         redraw_in();
         redraw_out();
-        redraw_rl();
-    }
-
-    function round_complex(c) {
-        return Complex(
-            round_n(c.re, 1),
-            round_n(c.im, 1)
-        )
+        RL.redraw();
     }
 
     /**
@@ -610,14 +578,13 @@
     }
 
     function circle_around(p) {
-        const n = 1000;
-        return [...Array(n).keys()].reverse().map(v => p.add({arg: ((v / n) * 2 * Math.PI), abs: 0.8}));
+        return math.range(0, math.tau, .005).map(a => p.add({arg: -a, abs: 0.8})).toArray();
     }
 
     function nyquist_contour() {
-        const omegas = math.range(-1.57, 1.57, .003).map(x => math.tan(x));
+        const omegas = math.range(0, math.pi, .003).map(x => math.tan(x));
         const omega_js = omegas.map(o => Complex(0, o));
-        return omega_js.toArray(); //.push(Complex(1000, 0));
+        return omega_js.toArray();
     }
 
     function start_animation() {
@@ -626,7 +593,7 @@
         }
         requestAnimationFrame(redraw_in_out);
 
-        points_start_index += 1;
+        headpoint_index += 1;
         setTimeout(start_animation, 5);
     }
 
@@ -648,6 +615,7 @@
             contour = nyquist_contour();
             plot = contour.map(f);
         }
+        headpoint_index = 0;
 
         if (!was_already_animating) {
             start_animation();
@@ -680,7 +648,10 @@
             poles_or_zeros.splice(0, poles_or_zeros.length, ...pz_to_keep);
         } else {
             // if no poles_or_zeros were removed: add one
-            clicked = round_complex(clicked);
+            clicked = Complex(
+                round_n(clicked.re, 1),
+                round_n(clicked.im, 1)
+            );
             poles_or_zeros.push(clicked);
             if (clicked.im !== 0) {
                 poles_or_zeros.push(clicked.conjugate())
@@ -688,8 +659,8 @@
         }
 
         plot = contour.map(f);
-        recalculate_root_lines();
-        requestAnimationFrame(redraw_all);
+        RL.recalculate_root_lines();
+        requestAnimationFrame(redraw_in_out);
         update_G_description();
         event.preventDefault();
     }
@@ -769,7 +740,7 @@
         k_pow_span.innerText = krange.value;
 
         plot = contour.map(f);
-        redraw_rl();
+        RL.redraw();
         update_K_in_G_description();
     }
 
@@ -797,7 +768,7 @@
     set_mode('zero'); // will not start animation on first call
     start_animation();
 
-    recalculate_root_lines();
+    RL.recalculate_root_lines();
     update_G_description();
     k_changed();
     layoutchanged(); // calls redraw_all
