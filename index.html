@@ -15,7 +15,7 @@
 
         body > div.column {
             text-align: center;
-            width: 31.33vw;
+            width: 23vw;
             float: left;
             margin: 0 1vw;
         }
@@ -28,6 +28,10 @@
         canvas {
             box-shadow: grey 2px 2px 4px;
             border-radius: 6px;
+        }
+
+        canvas#bode_canvas {
+            box-shadow: none;
         }
 
         table.equationtable {
@@ -57,7 +61,7 @@
 
 <div class="column">
     <h3>s-plane</h3>
-    <canvas id="input_canvas"></canvas>
+    <canvas id="input_canvas" style="/* cursor: none */"></canvas>
     <p>
         This is the input screen, showing the poles and zeros of the function G(s).
         Add or remove zeros and poles to G by left- and right-clicking.
@@ -93,12 +97,10 @@
         <label for="radiobutton_interactive">Interactive</label><br>
     </p>
 </div>
-<!--
 <div class="column">
     <h3>Bode Plot</h3>
     <canvas id="bode_canvas"></canvas>
 </div>
--->
 <div class="column">
     <h3>Root locus</h3>
     <canvas id="rlocus_canvas"></canvas>
@@ -125,7 +127,12 @@
 <script>
     Polynomial.setField('C');
 
-    let scale = 75;
+    let scale = 250;
+    const sharpness = 3;
+    const animation_speed = 2;
+    const contour_length = 500;
+    // let scale = 75;
+    // const sharpness = 5;
 
     const in_ctx = document.getElementById('input_canvas').getContext('2d');
     const out_ctx = document.getElementById('output_canvas').getContext('2d');
@@ -153,14 +160,17 @@
 
         ctx.canvas.addEventListener('mousemove', (event) => {
             if (event.buttons) {
+                const dx = event.movementX * sharpness;
+                const dy = event.movementY * sharpness;
                 if (ctx === in_ctx || ctx === rl_ctx) {
-                    in_ctx.translate(event.movementX, event.movementY);
-                    rl_ctx.translate(event.movementX, event.movementY);
+                    in_ctx.translate(dx, dy);
+                    rl_ctx.translate(dx, dy);
                     redraw_in();
                     RL.redraw();
                 } else {
-                    // (ctx === out_ctx)
-                    ctx.translate(event.movementX, event.movementY);
+                    ctx.translate(dx, dy);
+                }
+                if (ctx === out_ctx) {
                     redraw_out();
                 }
 
@@ -179,19 +189,22 @@
         ctx.save();
         ctx.font = '14px serif';
 
-        ctx.strokestyle = 'black';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = sharpness * 1;
 
         ctx.beginPath();
-        ctx.moveTo(-1000 * scale, 0);
-        ctx.lineTo(+1000 * scale, 0);
+        ctx.moveTo(-1000 * sharpness * scale, 0);
+        ctx.lineTo(+1000 * sharpness * scale, 0);
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.moveTo(0, -1000);
-        ctx.lineTo(0, +1000);
+        ctx.moveTo(0, -1000 * sharpness);
+        ctx.lineTo(0, +1000 * sharpness);
         ctx.stroke();
 
+        ctx.font = `${10 * sharpness}pt serif`;
+        const x = -10 * sharpness;
+        const y = 10 * sharpness;
         // labels
         for (let i = -axes_length; i <= axes_length; i++) {
             if (i === 0) {
@@ -201,27 +214,27 @@
             // x axis
             ctx.beginPath();
             ctx.moveTo(i * scale, 0);
-            ctx.lineTo(i * scale, 6);
+            ctx.lineTo(i * scale, 6 * sharpness);
             ctx.stroke();
 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'hanging';
-            ctx.fillText(`${i}`, i * scale, 10);
+            ctx.fillText(`${i}`, i * scale, y);
 
             // y axis
             ctx.beginPath();
             ctx.moveTo(0, i * scale);
-            ctx.lineTo(-6, i * scale);
+            ctx.lineTo(-6 * sharpness, i * scale);
             ctx.stroke();
 
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`${i}j`, -10, -i * scale);
+            ctx.fillText(`${i}j`, x, -i * scale);
         }
 
         ctx.textAlign = 'right';
         ctx.textBaseline = 'hanging';
-        ctx.fillText('0', -10, 10);
+        ctx.fillText('0', x, y);
 
         ctx.restore();
     }
@@ -252,30 +265,33 @@
         ctx.moveTo(...(points[0]));
 
         ctx.strokeStyle = 'cyan';
+        ctx.lineWidth = sharpness * 1;
         points.forEach(point => {
             ctx.lineTo(...point);
         });
 
         ctx.stroke();
 
-        const point = points[headpoint_index % points.length];
+        const point = points[(headpoint_index - 1 + points.length) % points.length];
         ctx.fillStyle = ctx.strokeStyle;
         ctx.beginPath();
-        ctx.arc(point[0], point[1], 3, 0, 2 * Math.PI);
+        ctx.arc(point[0], point[1], 3 * sharpness, 0, math.tau);
         ctx.fill();
 
         ctx.restore();
     }
 
     function draw_poles(ctx) {
-        const size = 3;
+        const size = 3 * sharpness;
         ctx.save();
         ctx.strokeStyle = 'blue';
+        ctx.lineWidth = sharpness * 1;
         poles.forEach(p => {
             ctx.beginPath();
             ctx.moveTo(p.re * scale - size, -(p.im * scale - size));
             ctx.lineTo(p.re * scale + size, -(p.im * scale + size));
             ctx.stroke();
+
             ctx.beginPath();
             ctx.moveTo(p.re * scale - size, -(p.im * scale + size));
             ctx.lineTo(p.re * scale + size, -(p.im * scale - size));
@@ -286,9 +302,10 @@
     }
 
     function draw_zeros(ctx) {
-        const r = 5;
+        const r = 5 * sharpness;
         ctx.save();
         ctx.strokeStyle = 'blue';
+        ctx.lineWidth = sharpness * 1;
         zeros.forEach(p => {
             ctx.beginPath();
             // ctx.moveTo(p.re * scale, -(p.im * scale));
@@ -311,7 +328,8 @@
             const s = headpoint(contour);
 
             in_ctx.save();
-            const r = 10;
+            const r = 10 * sharpness;
+            in_ctx.lineWidth = sharpness * 1;
             in_ctx.strokeStyle = 'lightgrey';
             poles.concat(zeros).forEach(c => {
                 in_ctx.beginPath();
@@ -321,6 +339,7 @@
             });
 
             in_ctx.strokeStyle = 'red';
+            in_ctx.lineWidth = sharpness * 1;
             poles.forEach(p => {
                 in_ctx.beginPath();
                 in_ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
@@ -328,6 +347,7 @@
             });
 
             in_ctx.strokeStyle = 'darkgreen';
+            in_ctx.lineWidth = sharpness * 1;
             zeros.forEach(z => {
                 in_ctx.beginPath();
                 in_ctx.arc(z.re * scale, -z.im * scale, r, -s.sub(z).arg(), 0);
@@ -337,18 +357,16 @@
             in_ctx.restore()
         };
 
-        requestAnimationFrame(() => {
 
-            in_ctx.clearRect(-1000, -1000, 2000, 2000);
-            add_axes(in_ctx);
+        in_ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
+        add_axes(in_ctx);
 
-            draw_points(in_ctx, contour);
+        draw_points(in_ctx, contour);
 
-            draw_in_phasors();
+        draw_in_phasors();
 
-            draw_poles(in_ctx);
-            draw_zeros(in_ctx);
-        })
+        draw_poles(in_ctx);
+        draw_zeros(in_ctx);
     }
 
     function redraw_out() {
@@ -357,12 +375,13 @@
                 return;
             }
             let sum_phase = 0;
-            let r = 10;
+            let r = 10 * sharpness;
 
             const s = headpoint(contour);
             out_ctx.save();
 
             out_ctx.strokeStyle = 'lightgrey';
+            out_ctx.lineWidth = 1 * sharpness;
             const fs = headpoint(plot);
 
             out_ctx.beginPath();
@@ -373,35 +392,37 @@
             out_ctx.strokeStyle = 'darkgreen';
 
             zeros.forEach(z => {
-                out_ctx.beginPath();
                 let phase = -s.sub(z).arg();
+
+                out_ctx.beginPath();
                 out_ctx.arc(0, 0, r, phase + sum_phase, sum_phase);
-                sum_phase += phase;
-                r += 5;
                 out_ctx.stroke();
+
+                sum_phase += phase;
+                r += 5 * sharpness;
             });
 
             out_ctx.strokeStyle = 'red';
             poles.forEach(p => {
-                out_ctx.beginPath();
                 let phase = s.sub(p).arg();
+
+                out_ctx.beginPath();
                 out_ctx.arc(0, 0, r, sum_phase, phase + sum_phase);
-                sum_phase += phase;
-                r += 5;
                 out_ctx.stroke();
+
+                sum_phase += phase;
+                r += 5 * sharpness;
             });
 
             out_ctx.restore()
         };
 
-        requestAnimationFrame(() => {
-            out_ctx.clearRect(-1000, -1000, 2000, 2000);
-            add_axes(out_ctx);
+        out_ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
+        add_axes(out_ctx);
 
-            draw_points(out_ctx, plot);
+        draw_points(out_ctx, plot);
 
-            draw_out_phasors();
-        });
+        draw_out_phasors();
     }
 
     function complex_rand() {
@@ -474,72 +495,72 @@
         }
 
         redraw() {
-            requestAnimationFrame(() => {
-                const draw_closed_loop_poles = () => {
-                    const ctx = this.ctx;
-                    console.log('calculating closed loop poles for a single K...')
-                    // 1 + KP = 0
-                    // P = counter / denominator
-                    // denominator + K counter = 0
+            const draw_closed_loop_poles = () => {
+                const ctx = this.ctx;
+                console.log('calculating closed loop poles for a single K...')
+                // 1 + KP = 0
+                // P = counter / denominator
+                // denominator + K counter = 0
 
-                    const counter = Polynomial.fromRoots(zeros);
-                    const denominator = Polynomial.fromRoots(poles);
+                const counter = Polynomial.fromRoots(zeros);
+                const denominator = Polynomial.fromRoots(poles);
 
-                    const poly = counter.mul(K).add(denominator).monic();
+                const poly = counter.mul(K).add(denominator).monic();
 
-                    const est = Array(poly.degree()).fill(0).map(complex_rand);
-                    poly.complexRoots(est).root.forEach(root => {
-                        let [x, y] = root.mul(scale).toVector();
+                const est = Array(poly.degree()).fill(0).map(complex_rand);
+                poly.complexRoots(est).root.forEach(root => {
+                    let [x, y] = root.mul(scale).toVector();
 
-                        ctx.save();
-                        // ctx.strokeStyle = 'black';
-                        ctx.lineWidth = 2;
-
-                        let d = .1 * scale;
-
-                        ctx.beginPath();
-                        ctx.moveTo(x - d, y);
-                        ctx.lineTo(x + d, y);
-                        ctx.stroke();
-
-                        ctx.beginPath();
-                        ctx.moveTo(x, y - d);
-                        ctx.lineTo(x, y + d);
-                        ctx.stroke();
-
-                        ctx.restore();
-                    });
-
-                };
-                const draw_root_lines = () => {
-                    const ctx = this.ctx;
                     ctx.save();
-                    ctx.strokeStyle = 'blue';
-                    ctx.lineWidth = 2;
+                    // ctx.strokeStyle = 'black';
+                    ctx.lineWidth = sharpness * 2;
 
-                    this.root_lines.forEach(root_line => {
-                        const points = root_line.map(s => s.mul(scale).toVector());
+                    let d = .1 * scale;
 
-                        ctx.beginPath();
-                        ctx.moveTo(...(points[0]));
-                        points.forEach(point => {
-                            ctx.lineTo(...point);
-                        });
+                    ctx.beginPath();
+                    ctx.moveTo(x - d, y);
+                    ctx.lineTo(x + d, y);
+                    ctx.stroke();
 
-                        ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(x, y - d);
+                    ctx.lineTo(x, y + d);
+                    ctx.stroke();
 
-                    });
                     ctx.restore();
-                };
-                this.ctx.clearRect(-1000, -1000, 2000, 2000);
-                add_axes(this.ctx);
+                });
 
-                draw_root_lines();
-                draw_closed_loop_poles();
+            };
+            const draw_root_lines = () => {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = sharpness * 2;
 
-                draw_poles(this.ctx);
-                draw_zeros(this.ctx);
-            })
+                this.root_lines.forEach(root_line => {
+                    const points = root_line.map(s => s.mul(scale).toVector());
+
+                    ctx.beginPath();
+                    ctx.moveTo(...(points[0]));
+                    points.forEach(point => {
+                        ctx.lineTo(...point);
+                    });
+
+                    ctx.stroke();
+
+                });
+                ctx.restore();
+            };
+
+
+            this.ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
+            add_axes(this.ctx);
+
+            draw_root_lines();
+            draw_closed_loop_poles();
+
+            draw_poles(this.ctx);
+            draw_zeros(this.ctx);
         }
     }
 
@@ -562,25 +583,26 @@
                 .getTransform()
                 .inverse()
                 .transformPoint({
-                    x: event.clientX - rect.left,
-                    y: event.clientY - rect.top
+                    x: (event.clientX - rect.left) * sharpness,
+                    y: (event.clientY - rect.top) * sharpness
                 })
         );
 
         return Complex(
-            point_unscaled.x / scale,
-            -point_unscaled.y / scale
-        )
+            point_unscaled.x,
+            -point_unscaled.y
+        ).div(scale)
     }
 
     function circle_around(p) {
-        return math.range(0, math.tau, .005).map(a => p.add({arg: -a, abs: 0.8})).toArray();
+        return math.range(0, math.tau, math.tau / contour_length).map(a => p.add({arg: -a, abs: 0.8})).toArray();
     }
 
     function nyquist_contour() {
-        const omegas = math.range(0, math.pi, .003).map(x => math.tan(x));
-        const omega_js = omegas.map(o => Complex(0, o));
-        return omega_js.toArray();
+        // const omegas = math.range(0, math.pi, .003).map(x => math.tan(x));
+        const omegas = math.range(-2, 2, 4/(contour_length / 2)).map(x => math.pow(10, x)).toArray();
+        const omega_js = omegas.concat(...omegas.map(x => -1/x)).map(o => Complex(0, o));
+        return omega_js;
     }
 
     function start_animation() {
@@ -591,8 +613,11 @@
         redraw_in();
         redraw_out();
 
-        headpoint_index += 1;
-        setTimeout(start_animation, 5);
+        bode.redraw();
+
+
+        headpoint_index += animation_speed;
+        requestAnimationFrame(start_animation);
     }
 
     function set_mode(new_mode) {
@@ -621,7 +646,7 @@
     }
 
     in_ctx.canvas.addEventListener('mousemove', (event) => {
-        if (mode === 'interactive') {
+        if (window.mode === 'interactive') {
             const coor = coor_for_event(event, in_ctx);
             contour.push(coor);
             plot.push(f(coor));
@@ -663,6 +688,8 @@
         redraw_out();
         G_desc.update();
         event.preventDefault();
+        bode.recalculate();
+        bode.redraw();
     }
 
     in_ctx.canvas.addEventListener('click', pole_or_zero_clicked);
@@ -743,6 +770,229 @@
 
     G_desc = new GDescription(document.getElementById('G_equation'));
 
+    class BodePlot {
+        constructor(ctx) {
+            this.tick_length = 10;
+
+            this.ctx = ctx;
+
+            this.min_omega_pow = -3;
+            this.max_omega_pow = 3;
+            this.n_x = 100;
+            this.omega_pows = math.range(
+                this.min_omega_pow,
+                this.max_omega_pow,
+                (this.max_omega_pow - this.min_omega_pow) / this.n_x
+            ).toArray();
+
+
+            this.tick_pows = math.range(this.min_omega_pow, this.max_omega_pow + 1, 1).toArray();
+            this.omega_js = this.omega_pows.map(x => Complex(0, math.pow(10, x)));
+
+            const superchar = i => i == 1 ? '' : i < 4 ? String.fromCodePoint(176 + i) : String.fromCodePoint(8304 + math.abs(i));
+            const pow_to_str = o => o == 0 ? '1' : (o < 0 ? '0.1' : '10') + superchar(math.abs(o));
+            this.tick_labels = this.tick_pows.map(pow_to_str);
+
+            this.recalculate();
+
+        }
+
+        complex_db(c) {
+            return 20 * math.log(c.abs())
+        }
+
+        complex_deg(c) {
+            return 180 * c.arg() / math.PI;
+        }
+
+        recalculate() {
+            const plot = this.omega_js.map(f);
+            const dbs = plot.map(this.complex_db);
+            const phases = plot.map(this.complex_deg);
+            // TODO: unwrap phases?
+
+            this.min_phase = math.min(...phases, 180);
+            this.max_phase = math.max(...phases, 180);
+            this.min_db = math.min(...dbs, 1);
+            this.max_db = math.max(...dbs, 1);
+
+            this.h = this.ctx.canvas.height;
+            this.w = this.ctx.canvas.width;
+
+            this.xmin = .12 * this.w;
+            this.xmax = .95 * this.w;
+
+            this.mag_top = this.ctx.lineWidth;
+            this.mag_bottom = .47 * this.h;
+
+            this.phase_top = .53 * this.h;
+            this.phase_bottom = this.h - this.ctx.lineWidth;
+
+            const omega_pow_to_x_scale = (this.xmax - this.xmin) / (this.max_omega_pow - this.min_omega_pow);
+            this.omega_pow_to_x = (o) => this.xmin + (o - this.min_omega_pow) * omega_pow_to_x_scale;
+
+            this.x_ticks = this.tick_pows.map(this.omega_pow_to_x);
+            this.x_data = this.omega_pows.map(this.omega_pow_to_x);
+
+            this.db_to_y = (sb) => this.mag_bottom - .05 * (this.mag_bottom - this.mag_top) -
+                (sb - this.min_db) * .9 * (this.mag_bottom - this.mag_top) / (this.max_db - this.min_db);
+
+            this.deg_to_y = (deg) => this.phase_bottom - .05 * (this.phase_bottom - this.phase_top) -
+                (deg - this.min_phase) * .9 * (this.phase_bottom - this.phase_top) / (this.max_phase - this.min_phase);
+
+            this.y_db_data = dbs.map(this.db_to_y);
+            this.y_phase_data = phases.map(this.deg_to_y);
+        }
+
+        draw_rectangles() {
+            this.ctx.rect(this.xmin, this.mag_top, this.xmax-this.xmin, this.mag_bottom - this.mag_top);
+            this.ctx.stroke();
+
+            this.ctx.rect(this.xmin, this.phase_top, this.xmax - this.xmin, this.phase_bottom - this.phase_top);
+            this.ctx.stroke();
+        };
+
+        draw_x_ticks() {
+            this.ctx.font = `${10 * sharpness}pt serif`;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+
+            this.x_ticks.forEach((x, i) => {
+                this.ctx.moveTo(x, this.mag_bottom);
+                this.ctx.lineTo(x, this.mag_bottom + this.tick_length);
+
+                this.ctx.fillText(this.tick_labels[i], x, this.h / 2);
+
+                this.ctx.moveTo(x, this.phase_top);
+                this.ctx.lineTo(x, this.phase_top - this.tick_length);
+            });
+            this.ctx.stroke();
+        }
+
+        draw_data(xs, ys) {
+            this.ctx.moveTo(xs[0], ys[0]);
+            ys.forEach((y, i) => this.ctx.lineTo(xs[i], y));
+            this.ctx.stroke();
+        }
+
+        draw_yticks(ys, labels) {
+            
+        }
+
+        draw_amplitude() {
+            // yticks amp
+            {
+                this.ctx.textAlign = 'right';
+                this.ctx.textBaseline = 'middle';
+                [
+                    ...math.range(0, this.max_db, 20).toArray(),
+                    ...math.range(0, this.min_db, -20).toArray().slice(1)
+                ].forEach(amp => {
+                    const y = this.db_to_y(amp);
+
+                    this.ctx.moveTo(this.xmin, y);
+                    this.ctx.lineTo(this.xmin - this.tick_length, y);
+
+                    this.ctx.fillText(`${amp}dB`, this.xmin - this.tick_length - 5, y);
+                });
+                this.ctx.stroke();
+            }
+
+            // data amp
+            this.draw_data(this.x_data, this.y_db_data);
+
+        }
+
+        draw_phase() {
+            // yticks deg
+            {
+                this.ctx.textAlign = 'right';
+                this.ctx.textBaseline = 'middle';
+                [
+                    ...math.range(0, this.max_phase * 1.05, 45).toArray(),
+                    ...math.range(0, this.min_phase * 1.01, -45).toArray().slice(1)
+                ].forEach(deg => {
+                    const y = this.deg_to_y(deg);
+
+                    this.ctx.moveTo(this.xmin, y);
+                    this.ctx.lineTo(this.xmin - this.tick_length, y);
+
+                    this.ctx.fillText(`${deg}°`, this.xmin - this.tick_length - 5, y);
+                });
+                this.ctx.stroke();
+            }
+
+            this.draw_data(this.x_data, this.y_phase_data);
+        }
+
+        add_nyquist_helplines() {
+            const ctx = this.ctx;
+            ctx.save();
+
+            const s = headpoint(contour);
+            const p = f(Complex(0, s.abs()));
+            const x = this.omega_pow_to_x(math.log10(s.abs() + .0001));
+            const deg_y = this.deg_to_y(this.complex_deg(p));
+            const amp_y = this.db_to_y(this.complex_db(p));
+
+            ctx.strokeStyle = 'lightgray';
+
+            ctx.beginPath();
+            ctx.moveTo(x, this.mag_top);
+            ctx.lineTo(x, this.mag_bottom);
+
+            ctx.moveTo(x, this.phase_top);
+            ctx.lineTo(x, this.phase_bottom);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(this.xmin, deg_y);
+            ctx.lineTo(x, deg_y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(this.xmin, amp_y);
+            ctx.lineTo(x, amp_y);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        add_margin_lines() {
+            // TODO: margin lines?
+        }
+
+        redraw() {
+            const ctx = this.ctx;
+
+            ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
+
+
+            ctx.lineWidth = sharpness * 1;
+
+            ctx.save();
+
+            ctx.beginPath();
+            ctx.strokeStyle = 'black';
+
+            this.draw_rectangles();
+            this.draw_x_ticks();
+
+            this.draw_amplitude();
+            this.draw_phase();
+
+            if (mode === 'nyquist') {
+                this.add_nyquist_helplines();
+            } else {
+                this.add_margin_lines();
+            }
+
+
+            ctx.restore()
+        }
+    }
+
+    bode = new BodePlot(document.getElementById('bode_canvas').getContext('2d'));
 
     function k_changed() {
         K = Math.pow(10, krange.value);
@@ -751,6 +1001,8 @@
         plot = contour.map(f);
         RL.redraw();
         G_desc.update_K();
+        bode.recalculate();
+        bode.redraw();
     }
 
     krange.addEventListener('input', k_changed);
@@ -759,24 +1011,30 @@
         let canvases = document.querySelectorAll('canvas');
         canvases.forEach(canvas => {
             let w = canvas.parentElement.clientWidth;
-            canvas.width = w;
-            canvas.height = w;
+            canvas.width = w * sharpness;
+            canvas.height = w * sharpness;
+            canvas.style.width = w + 'px';
+            canvas.style.height = w + 'px';
         });
 
         in_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
         out_ctx.translate(out_ctx.canvas.height / 2, out_ctx.canvas.height / 2);
         rl_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
 
-        scale = canvases[0].parentElement.clientWidth / 6;
+        // scale = canvases[0].parentElement.clientWidth / 6;
 
         redraw_in();
         redraw_out();
         RL.redraw();
+
+        bode.recalculate();
+        bode.redraw();
     }
 
     window.addEventListener('resize', layoutchanged);
 
     set_mode('zero'); // will not start animation on first call
+    // set_mode('nyquist'); // will not start animation on first call
     start_animation();
 
     RL.recalculate_root_lines();
@@ -792,6 +1050,5 @@ TODO:
 - bode plot?
 - tabel met np en polen
 - tan(t) in K van Nyquist contour
-- scale veranderen naar https://www.w3schools.com/jsref/canvas_scale.asp
 -->
 </html>
