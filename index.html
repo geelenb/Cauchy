@@ -17,7 +17,7 @@
             text-align: center;
             width: 31.33vw;
             float: left;
-            margin: 1vw;
+            margin: 0 1vw;
         }
 
         body > div#credits {
@@ -615,9 +615,9 @@
     }
 
     function nyquist_contour() {
-        const n = 1000;
-        const omega_js = [...Array(n).keys()].map(o => (o + 1) / 10).map(o => Complex.I.mul(o));
-        return omega_js.concat([Complex(1000)], omega_js.map(oj => oj.conjugate()).reverse(), [Complex.ZERO]);
+        const omegas = math.range(-1.57, 1.57, .003).map(x => math.tan(x));
+        const omega_js = omegas.map(o => Complex(0, o));
+        return omega_js.toArray(); //.push(Complex(1000, 0));
     }
 
     function start_animation() {
@@ -697,6 +697,11 @@
     in_ctx.canvas.addEventListener('click', pole_or_zero_clicked);
     in_ctx.canvas.addEventListener('contextmenu', pole_or_zero_clicked);
 
+    function update_K_in_G_description() {
+        let K_str = K === 1 ? '' : String(round_n(K, 2));
+        Array.from(document.getElementsByClassName('K_val')).forEach(elem => elem.innerText = K_str);
+    }
+
     function update_G_description() {
         const roots_to_html = roots => {
             if (roots.length == 0) {
@@ -736,12 +741,10 @@
         let denominator_roots = roots_to_html(poles);
         let denominator_polynomic = roots_to_html_poly(poles);
 
-        let K_str = K === 1 ? '' : String(round_n(K, 2));
-
         document.getElementById('G_equation').innerHTML = [
             '<table class="equationtable"><tr>',
             '<td rowspan="2">KG(s)</td>',
-            '<td rowspan="2">=&nbsp;', K_str, ' </td>',
+            '<td rowspan="2" >=&nbsp; <span class="K_val"></span> </td>',
             `<td class="counter">&nbsp;${counter_roots}&nbsp;</td>`,
             '</tr>',
             '<tr>',
@@ -750,7 +753,7 @@
             '<tr style="height: 2ch"></tr>',
             '<tr>',
             '<td rowspan="2"></td>',
-            '<td rowspan="2">&nbsp;=&nbsp;', K_str, ' </td>',
+            '<td rowspan="2">&nbsp;=&nbsp;<span class="K_val"></span> </td>',
             `<td class="counter">&nbsp;${counter_polynomic}&nbsp;</td>`,
             '</tr>',
             '<tr>',
@@ -758,6 +761,7 @@
             '</tr>',
             '</table>'
         ].join('');
+        update_K_in_G_description();
     }
 
     function k_changed() {
@@ -766,7 +770,7 @@
 
         plot = contour.map(f);
         redraw_rl();
-        update_G_description();
+        update_K_in_G_description();
     }
 
     krange.addEventListener('input', k_changed);
@@ -794,7 +798,8 @@
     start_animation();
 
     recalculate_root_lines();
-    k_changed(); // calls update_G_description
+    update_G_description();
+    k_changed();
     layoutchanged(); // calls redraw_all
 </script>
 </body>
