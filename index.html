@@ -138,8 +138,15 @@
     let points_start_index = 30;
 
     const zeros = [Complex(-2)];
-    let poles = [Complex(-3, -2), Complex(-3, 2)];
+    const poles = [Complex(-3, -2), Complex(-3, 2)];
     let K = 1;
+
+    function f(s) {
+        s = Complex(s);
+        const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
+        const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
+        return counter.mul(K).div(denominator);
+    }
 
     function add_drag(ctx) {
         ctx.canvas.addEventListener('mousedown', () => ctx.canvas.isdragging = false);
@@ -296,15 +303,6 @@
 
     const mul = (a, b) => a.mul(b);
     const div = (a, b) => a.div(b);
-
-    function make_function() {
-        return s => {
-            s = Complex(s);
-            const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
-            const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
-            return counter.mul(K).div(denominator);
-        }
-    }
 
     function redraw_in() {
         const draw_in_phasors = () => {
@@ -590,7 +588,7 @@
      * @returns {number}
      */
     function round_n(x, n) {
-        p = Math.pow(10, n);
+        let p = Math.pow(10, n);
         return Math.round(x * p) / p
     }
 
@@ -642,13 +640,13 @@
             plot = [];
         } else if (new_mode === 'zero') {
             contour = circle_around(zeros[math.randomInt(zeros.length)]);
-            plot = contour.map(make_function());
+            plot = contour.map(f);
         } else if (new_mode === 'pole') {
             contour = circle_around(poles[math.randomInt(poles.length)]);
-            plot = contour.map(make_function());
+            plot = contour.map(f);
         } else if (new_mode === 'nyquist') {
             contour = nyquist_contour();
-            plot = contour.map(make_function());
+            plot = contour.map(f);
         }
 
         if (!was_already_animating) {
@@ -660,7 +658,7 @@
         if (mode === 'interactive') {
             const coor = coor_for_event(event, in_ctx);
             contour.push(coor);
-            plot.push(make_function()(coor));
+            plot.push(f(coor));
 
             requestAnimationFrame(redraw_in_out);
         }
@@ -689,7 +687,7 @@
             }
         }
 
-        plot = contour.map(make_function());
+        plot = contour.map(f);
         recalculate_root_lines();
         requestAnimationFrame(redraw_all);
         update_G_description();
@@ -766,8 +764,7 @@
         K = Math.pow(10, krange.value);
         k_pow_span.innerText = krange.value;
 
-        plot = contour.map(make_function());
-        redraw_out();
+        plot = contour.map(f);
         redraw_rl();
         update_G_description();
     }
