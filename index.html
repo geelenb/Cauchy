@@ -156,12 +156,12 @@
                 if (ctx === in_ctx || ctx === rl_ctx) {
                     in_ctx.translate(event.movementX, event.movementY);
                     rl_ctx.translate(event.movementX, event.movementY);
-                    requestAnimationFrame(redraw_in);
-                    requestAnimationFrame(RL.redraw);
+                    redraw_in();
+                    RL.redraw();
                 } else {
                     // (ctx === out_ctx)
                     ctx.translate(event.movementX, event.movementY);
-                    requestAnimationFrame(redraw_out);
+                    redraw_out();
                 }
 
                 ctx.canvas.isdragging = true;
@@ -337,15 +337,18 @@
             in_ctx.restore()
         };
 
-        in_ctx.clearRect(-1000, -1000, 2000, 2000);
-        add_axes(in_ctx);
+        requestAnimationFrame(() => {
 
-        draw_points(in_ctx, contour);
+            in_ctx.clearRect(-1000, -1000, 2000, 2000);
+            add_axes(in_ctx);
 
-        draw_in_phasors();
+            draw_points(in_ctx, contour);
 
-        draw_poles(in_ctx);
-        draw_zeros(in_ctx);
+            draw_in_phasors();
+
+            draw_poles(in_ctx);
+            draw_zeros(in_ctx);
+        })
     }
 
     function redraw_out() {
@@ -391,12 +394,14 @@
             out_ctx.restore()
         };
 
-        out_ctx.clearRect(-1000, -1000, 2000, 2000);
-        add_axes(out_ctx);
+        requestAnimationFrame(() => {
+            out_ctx.clearRect(-1000, -1000, 2000, 2000);
+            add_axes(out_ctx);
 
-        draw_points(out_ctx, plot);
+            draw_points(out_ctx, plot);
 
-        draw_out_phasors();
+            draw_out_phasors();
+        });
     }
 
     function complex_rand() {
@@ -465,89 +470,80 @@
                 roots.forEach((root, i) =>
                     this.root_lines[i].push(root)));
 
-            requestAnimationFrame(this.redraw);
+            this.redraw();
         }
 
         redraw() {
-            const draw_closed_loop_poles = () => {
-                const ctx = this.ctx;
-                console.log('calculating closed loop poles for a single K...')
-                // 1 + KP = 0
-                // P = counter / denominator
-                // denominator + K counter = 0
+            requestAnimationFrame(() => {
+                const draw_closed_loop_poles = () => {
+                    const ctx = this.ctx;
+                    console.log('calculating closed loop poles for a single K...')
+                    // 1 + KP = 0
+                    // P = counter / denominator
+                    // denominator + K counter = 0
 
-                const counter = Polynomial.fromRoots(zeros);
-                const denominator = Polynomial.fromRoots(poles);
+                    const counter = Polynomial.fromRoots(zeros);
+                    const denominator = Polynomial.fromRoots(poles);
 
-                const poly = counter.mul(K).add(denominator).monic();
+                    const poly = counter.mul(K).add(denominator).monic();
 
-                const est = Array(poly.degree()).fill(0).map(complex_rand);
-                poly.complexRoots(est).root.forEach(root => {
-                    let [x, y] = root.mul(scale).toVector();
+                    const est = Array(poly.degree()).fill(0).map(complex_rand);
+                    poly.complexRoots(est).root.forEach(root => {
+                        let [x, y] = root.mul(scale).toVector();
 
-                    ctx.save();
-                    // ctx.strokeStyle = 'black';
-                    ctx.lineWidth = 2;
+                        ctx.save();
+                        // ctx.strokeStyle = 'black';
+                        ctx.lineWidth = 2;
 
-                    let d = .1 * scale;
+                        let d = .1 * scale;
 
-                    ctx.beginPath();
-                    ctx.moveTo(x - d, y);
-                    ctx.lineTo(x + d, y);
-                    ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(x - d, y);
+                        ctx.lineTo(x + d, y);
+                        ctx.stroke();
 
-                    ctx.beginPath();
-                    ctx.moveTo(x, y - d);
-                    ctx.lineTo(x, y + d);
-                    ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(x, y - d);
+                        ctx.lineTo(x, y + d);
+                        ctx.stroke();
 
-                    ctx.restore();
-                });
-
-            };
-            const draw_root_lines = () => {
-                const ctx = this.ctx;
-                ctx.save();
-                ctx.strokeStyle = 'blue';
-                ctx.lineWidth = 2;
-
-                this.root_lines.forEach(root_line => {
-                    const points = root_line.map(s => s.mul(scale).toVector());
-
-                    ctx.beginPath();
-                    ctx.moveTo(...(points[0]));
-                    points.forEach(point => {
-                        ctx.lineTo(...point);
+                        ctx.restore();
                     });
 
-                    ctx.stroke();
+                };
+                const draw_root_lines = () => {
+                    const ctx = this.ctx;
+                    ctx.save();
+                    ctx.strokeStyle = 'blue';
+                    ctx.lineWidth = 2;
 
-                });
-                ctx.restore();
-            };
-            this.ctx.clearRect(-1000, -1000, 2000, 2000);
-            add_axes(this.ctx);
+                    this.root_lines.forEach(root_line => {
+                        const points = root_line.map(s => s.mul(scale).toVector());
 
-            draw_root_lines();
-            draw_closed_loop_poles();
+                        ctx.beginPath();
+                        ctx.moveTo(...(points[0]));
+                        points.forEach(point => {
+                            ctx.lineTo(...point);
+                        });
 
-            draw_poles(this.ctx);
-            draw_zeros(this.ctx);
+                        ctx.stroke();
+
+                    });
+                    ctx.restore();
+                };
+                this.ctx.clearRect(-1000, -1000, 2000, 2000);
+                add_axes(this.ctx);
+
+                draw_root_lines();
+                draw_closed_loop_poles();
+
+                draw_poles(this.ctx);
+                draw_zeros(this.ctx);
+            })
         }
     }
 
     RL = new RootLocus(rl_ctx);
-
-    function redraw_in_out() {
-        redraw_in();
-        redraw_out();
-    }
-
-    function redraw_all() {
-        redraw_in();
-        redraw_out();
-        RL.redraw();
-    }
 
     /**
      * Round to n decimals after point
@@ -591,7 +587,9 @@
         if (window.mode === 'interactive') {
             return;
         }
-        requestAnimationFrame(redraw_in_out);
+
+        redraw_in();
+        redraw_out();
 
         headpoint_index += 1;
         setTimeout(start_animation, 5);
@@ -628,7 +626,8 @@
             contour.push(coor);
             plot.push(f(coor));
 
-            requestAnimationFrame(redraw_in_out);
+            redraw_in();
+            redraw_out();
         }
     });
 
@@ -660,80 +659,90 @@
 
         plot = contour.map(f);
         RL.recalculate_root_lines();
-        requestAnimationFrame(redraw_in_out);
-        update_G_description();
+        redraw_in();
+        redraw_out();
+        G_desc.update();
         event.preventDefault();
     }
 
     in_ctx.canvas.addEventListener('click', pole_or_zero_clicked);
     in_ctx.canvas.addEventListener('contextmenu', pole_or_zero_clicked);
 
-    function update_K_in_G_description() {
-        let K_str = K === 1 ? '' : String(round_n(K, 2));
-        Array.from(document.getElementsByClassName('K_val')).forEach(elem => elem.innerText = K_str);
+    class GDescription {
+        constructor(elem_to_fill) {
+            this.root = elem_to_fill;
+        }
+
+        update_K() {
+            let K_str = K === 1 ? '' : String(round_n(K, 2));
+            Array.from(document.getElementsByClassName('K_val')).forEach(elem => elem.innerText = K_str);
+        }
+
+        update() {
+            const roots_to_html = roots => {
+                if (roots.length == 0) {
+                    return '1';
+                }
+                const complex_to_str = c => (c.re < 0 || (c.re == 0 && c.im < 0)) ? c.toString() : ('+' + c.toString());
+                const complex_to_s_minus = c => Complex.ZERO.equals(c) ? 's' : '(s' + complex_to_str(Complex(0).sub(c)) + ')';
+                const add_spacing = s => s.replaceAll('i', 'j').replaceAll('+', '&nbsp+&nbsp').replaceAll('-', '&nbsp-&nbsp');
+
+                // TODO : powers for double roots?
+
+                let html = roots.map(complex_to_s_minus).map(add_spacing).join('&nbsp;');
+
+                if (roots.length == 1) {
+                    html = html.substr(1, html.length - 2)
+                }
+
+                return html
+            };
+
+            const roots_to_html_poly = roots => {
+                if (roots.length === 0) {
+                    return '1';
+                }
+                const poly = Polynomial.fromRoots(roots);
+                const coeffs = poly.monic().coeff;
+
+                const s_pow = (pow) => pow === '0' ? '' : pow === '1' ? 's' : `s<sup>${pow}</sup>`;
+
+                return Object.entries(coeffs).reverse().map(([pow, coeff], i) =>
+                    `${coeff === 1 ? '' : round_n(coeff, 3)}${s_pow(pow)}`
+                ).join('&nbsp;+&nbsp;').replaceAll('+&nbsp;-', '-&nbsp;').replaceAll('i', 'j');
+            };
+
+            let counter_roots = roots_to_html(zeros);
+            let counter_polynomic = roots_to_html_poly(zeros);
+            let denominator_roots = roots_to_html(poles);
+            let denominator_polynomic = roots_to_html_poly(poles);
+
+            this.root.innerHTML = [
+                '<table class="equationtable"><tr>',
+                '<td rowspan="2">KG(s)</td>',
+                '<td rowspan="2" >=&nbsp; <span class="K_val"></span> </td>',
+                `<td class="counter">&nbsp;${counter_roots}&nbsp;</td>`,
+                '</tr>',
+                '<tr>',
+                `<td>&nbsp;${denominator_roots}&nbsp;</td>`,
+                '</tr>',
+                '<tr style="height: 2ch"></tr>',
+                '<tr>',
+                '<td rowspan="2"></td>',
+                '<td rowspan="2">&nbsp;=&nbsp;<span class="K_val"></span> </td>',
+                `<td class="counter">&nbsp;${counter_polynomic}&nbsp;</td>`,
+                '</tr>',
+                '<tr>',
+                `<td>&nbsp;${denominator_polynomic}&nbsp;</td>`,
+                '</tr>',
+                '</table>'
+            ].join('');
+            this.update_K();
+        }
     }
 
-    function update_G_description() {
-        const roots_to_html = roots => {
-            if (roots.length == 0) {
-                return '1';
-            }
-            const complex_to_str = c => (c.re < 0 || (c.re == 0 && c.im < 0)) ? c.toString() : ('+' + c.toString());
-            const complex_to_s_minus = c => Complex.ZERO.equals(c) ? 's' : '(s' + complex_to_str(Complex(0).sub(c)) + ')';
-            const add_spacing = s => s.replaceAll('i', 'j').replaceAll('+', '&nbsp+&nbsp').replaceAll('-', '&nbsp-&nbsp');
+    G_desc = new GDescription(document.getElementById('G_equation'));
 
-            // TODO : powers for double roots?
-
-            let html = roots.map(complex_to_s_minus).map(add_spacing).join('&nbsp;');
-
-            if (roots.length == 1) {
-                html = html.substr(1, html.length - 2)
-            }
-
-            return html
-        };
-
-        const roots_to_html_poly = roots => {
-            if (roots.length === 0) {
-                return '1';
-            }
-            const poly = Polynomial.fromRoots(roots);
-            const coeffs = poly.monic().coeff;
-
-            const s_pow = (pow) => pow === '0' ? '' : pow === '1' ? 's' : `s<sup>${pow}</sup>`;
-
-            return Object.entries(coeffs).reverse().map(([pow, coeff], i) =>
-                `${coeff === 1 ? '' : round_n(coeff, 3)}${s_pow(pow)}`
-            ).join('&nbsp;+&nbsp;').replaceAll('+&nbsp;-', '-&nbsp;').replaceAll('i', 'j');
-        };
-
-        let counter_roots = roots_to_html(zeros);
-        let counter_polynomic = roots_to_html_poly(zeros);
-        let denominator_roots = roots_to_html(poles);
-        let denominator_polynomic = roots_to_html_poly(poles);
-
-        document.getElementById('G_equation').innerHTML = [
-            '<table class="equationtable"><tr>',
-            '<td rowspan="2">KG(s)</td>',
-            '<td rowspan="2" >=&nbsp; <span class="K_val"></span> </td>',
-            `<td class="counter">&nbsp;${counter_roots}&nbsp;</td>`,
-            '</tr>',
-            '<tr>',
-            `<td>&nbsp;${denominator_roots}&nbsp;</td>`,
-            '</tr>',
-            '<tr style="height: 2ch"></tr>',
-            '<tr>',
-            '<td rowspan="2"></td>',
-            '<td rowspan="2">&nbsp;=&nbsp;<span class="K_val"></span> </td>',
-            `<td class="counter">&nbsp;${counter_polynomic}&nbsp;</td>`,
-            '</tr>',
-            '<tr>',
-            `<td>&nbsp;${denominator_polynomic}&nbsp;</td>`,
-            '</tr>',
-            '</table>'
-        ].join('');
-        update_K_in_G_description();
-    }
 
     function k_changed() {
         K = Math.pow(10, krange.value);
@@ -741,7 +750,7 @@
 
         plot = contour.map(f);
         RL.redraw();
-        update_K_in_G_description();
+        G_desc.update_K();
     }
 
     krange.addEventListener('input', k_changed);
@@ -760,7 +769,9 @@
 
         scale = canvases[0].parentElement.clientWidth / 6;
 
-        requestAnimationFrame(redraw_all);
+        redraw_in();
+        redraw_out();
+        RL.redraw();
     }
 
     window.addEventListener('resize', layoutchanged);
@@ -769,7 +780,7 @@
     start_animation();
 
     RL.recalculate_root_lines();
-    update_G_description();
+    G_desc.update();
     k_changed();
     layoutchanged(); // calls redraw_all
 </script>
