@@ -141,7 +141,79 @@
     const k_pow_span = document.getElementById('k_pow_span');
 
     let contour = [];
-    let plot = [];
+
+    class Output {
+        constructor(ctx) {
+            this.ctx = ctx;
+            this.plot = [];
+        }
+
+        recalculate() {
+            this.plot = contour.map(f);
+        }
+
+        draw_phasors() {
+            const ctx = this.ctx;
+            if (contour.length === 0) {
+                return;
+            }
+            let sum_phase = 0;
+            let r = 10 * sharpness;
+
+            const s = headpoint(contour);
+            ctx.save();
+
+            ctx.strokeStyle = 'lightgrey';
+            ctx.lineWidth = 1 * sharpness;
+            const fs = headpoint(this.plot);
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(fs.re * scale, -fs.im * scale);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'darkgreen';
+
+            zeros.forEach(z => {
+                let phase = -s.sub(z).arg();
+
+                ctx.beginPath();
+                ctx.arc(0, 0, r, phase + sum_phase, sum_phase);
+                ctx.stroke();
+
+                sum_phase += phase;
+                r += 5 * sharpness;
+            });
+
+            ctx.strokeStyle = 'red';
+            poles.forEach(p => {
+                let phase = s.sub(p).arg();
+
+                ctx.beginPath();
+                ctx.arc(0, 0, r, sum_phase, phase + sum_phase);
+                ctx.stroke();
+
+                sum_phase += phase;
+                r += 5 * sharpness;
+            });
+
+            ctx.restore()
+        };
+
+        redraw() {
+            const ctx = this.ctx;
+            ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
+            add_axes(ctx);
+
+            draw_points(ctx, this.plot);
+
+            this.draw_phasors();
+        }
+
+    }
+
+    OUT = new Output(out_ctx);
+
     let headpoint_index = 0;
 
     const zeros = [Complex(-2)];
@@ -171,7 +243,7 @@
                     ctx.translate(dx, dy);
                 }
                 if (ctx === out_ctx) {
-                    redraw_out();
+                    OUT.redraw();
                 }
 
                 ctx.canvas.isdragging = true;
@@ -252,11 +324,11 @@
             return;
         }
 
-        if (window.mode === 'interactive') {
-            const n = points.length;
-            // only plot last sqrt (length) items of points
-            points = points.slice(Math.floor(n - Math.sqrt(n)));
-        }
+        // if (window.mode === 'interactive') {
+        //     const n = points.length;
+        //     only plot last sqrt (length) items of points
+        // points = points.slice(Math.floor(n - Math.sqrt(n)));
+        // }
 
         points = points.map(s => [s.re * scale, -s.im * scale]);
 
@@ -367,62 +439,6 @@
 
         draw_poles(in_ctx);
         draw_zeros(in_ctx);
-    }
-
-    function redraw_out() {
-        const draw_out_phasors = () => {
-            if (contour.length === 0) {
-                return;
-            }
-            let sum_phase = 0;
-            let r = 10 * sharpness;
-
-            const s = headpoint(contour);
-            out_ctx.save();
-
-            out_ctx.strokeStyle = 'lightgrey';
-            out_ctx.lineWidth = 1 * sharpness;
-            const fs = headpoint(plot);
-
-            out_ctx.beginPath();
-            out_ctx.moveTo(0, 0);
-            out_ctx.lineTo(fs.re * scale, -fs.im * scale);
-            out_ctx.stroke();
-
-            out_ctx.strokeStyle = 'darkgreen';
-
-            zeros.forEach(z => {
-                let phase = -s.sub(z).arg();
-
-                out_ctx.beginPath();
-                out_ctx.arc(0, 0, r, phase + sum_phase, sum_phase);
-                out_ctx.stroke();
-
-                sum_phase += phase;
-                r += 5 * sharpness;
-            });
-
-            out_ctx.strokeStyle = 'red';
-            poles.forEach(p => {
-                let phase = s.sub(p).arg();
-
-                out_ctx.beginPath();
-                out_ctx.arc(0, 0, r, sum_phase, phase + sum_phase);
-                out_ctx.stroke();
-
-                sum_phase += phase;
-                r += 5 * sharpness;
-            });
-
-            out_ctx.restore()
-        };
-
-        out_ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
-        add_axes(out_ctx);
-
-        draw_points(out_ctx, plot);
-
-        draw_out_phasors();
     }
 
     function complex_rand() {
@@ -610,7 +626,7 @@
         }
 
         redraw_in();
-        redraw_out();
+        OUT.redraw();
 
         bode.redraw();
 
@@ -619,26 +635,24 @@
     }
 
     function set_mode(new_mode) {
-        const was_already_animating = window.mode !== 'interactive';
+        const was_not_animating = window.mode === 'interactive';
 
         window.mode = new_mode;
 
         if (new_mode === 'interactive') {
             contour = [];
-            plot = [];
         } else if (new_mode === 'zero') {
             contour = circle_around(zeros[math.randomInt(zeros.length)]);
-            plot = contour.map(f);
         } else if (new_mode === 'pole') {
             contour = circle_around(poles[math.randomInt(poles.length)]);
-            plot = contour.map(f);
         } else if (new_mode === 'nyquist') {
             contour = nyquist_contour();
-            plot = contour.map(f);
         }
+
+        OUT.recalculate();
         headpoint_index = 0;
 
-        if (!was_already_animating) {
+        if (was_not_animating) {
             start_animation();
         }
     }
@@ -647,10 +661,10 @@
         if (window.mode === 'interactive') {
             const coor = coor_for_event(event, in_ctx);
             contour.push(coor);
-            plot.push(f(coor));
+            OUT.plot.push(f(coor));
 
             redraw_in();
-            redraw_out();
+            OUT.redraw();
         }
     });
 
@@ -683,7 +697,7 @@
         plot = contour.map(f);
         RL.recalculate_root_lines();
         redraw_in();
-        redraw_out();
+        OUT.redraw();
         G_desc.update();
         event.preventDefault();
         bode.recalculate();
@@ -782,7 +796,7 @@
                 this.min_omega_pow,
                 this.max_omega_pow,
                 (this.max_omega_pow - this.min_omega_pow) / n_x
-            ).toArray();
+            ).toArray().concat([this.max_omega_pow]);
 
             this.tick_pows = math.range(this.min_omega_pow, this.max_omega_pow + 1, 1).toArray();
             this.omega_js = this.omega_pows.map(x => Complex(0, math.pow(10, x)));
@@ -980,7 +994,8 @@
         K = Math.pow(10, krange.value);
         k_pow_span.innerText = krange.value;
 
-        plot = contour.map(f);
+        OUT.recalculate();
+        OUT.redraw();
         RL.redraw();
         G_desc.update_K();
         bode.recalculate();
@@ -1006,7 +1021,7 @@
         // scale = canvases[0].parentElement.clientWidth / 6;
 
         redraw_in();
-        redraw_out();
+        OUT.redraw();
         RL.redraw();
 
         bode.recalculate();
@@ -1029,8 +1044,6 @@
 <!--
 TODO:
 - op welk punt staat de muis?
-- bode plot?
 - tabel met np en polen
-- tan(t) in K van Nyquist contour
 -->
 </html>
