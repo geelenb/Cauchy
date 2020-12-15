@@ -30,6 +30,10 @@
             border-radius: 6px;
         }
 
+        canvas#input_canvas {
+            cursor: crosshair;
+        }
+
         canvas#bode_canvas {
             box-shadow: none;
         }
@@ -129,7 +133,7 @@
 
     let scale = 250;
     const sharpness = 3;
-    const animation_speed = .5; // = revolutions per second in 'orbit' mode
+    const animation_speed = 1 / 4; // = revolutions per second in 'orbit' mode
     const contour_length = 500;
     const in_ctx = document.getElementById('input_canvas').getContext('2d');
     const out_ctx = document.getElementById('output_canvas').getContext('2d');
