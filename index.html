@@ -129,7 +129,7 @@
 
     let scale = 250;
     const sharpness = 3;
-    const animation_speed = 2;
+    const animation_speed = .5; // = revolutions per second in 'orbit' mode
     const contour_length = 500;
     const in_ctx = document.getElementById('input_canvas').getContext('2d');
     const out_ctx = document.getElementById('output_canvas').getContext('2d');
@@ -210,8 +210,6 @@
     }
 
     OUT = new OutputCanvas(out_ctx);
-
-    let headpoint_index = 0;
 
     const zeros = [Complex(-2)];
     const poles = [Complex(-1, 1), Complex(-1, -1)];
@@ -312,7 +310,7 @@
         if (mode === 'interactive') {
             return points[points.length - 1];
         } else {
-            return points[headpoint_index % points.length];
+            return points[math.round(new Date().getTime() * animation_speed * contour_length / 1000) % points.length];
         }
     }
 
@@ -335,7 +333,7 @@
 
         ctx.stroke();
 
-        const point = points[(headpoint_index - 1 + points.length) % points.length];
+        const point = headpoint(points);
         ctx.fillStyle = ctx.strokeStyle;
         ctx.beginPath();
         ctx.arc(point[0], point[1], 3 * sharpness, 0, math.tau);
@@ -425,14 +423,14 @@
                 bode.redraw();
 
                 event.preventDefault();
-            }
+            };
 
             canvas.addEventListener('click', pole_or_zero_clicked);
             canvas.addEventListener('contextmenu', pole_or_zero_clicked);
 
             canvas.addEventListener('mousemove', (event) => {
                 if (window.mode === 'interactive') {
-                    const coor = this.coor_for_event(event, in_ctx);
+                    const coor = this.coor_for_event(event, this.ctx);
                     this.contour.push(coor);
                     OUT.recalculate();
 
@@ -708,7 +706,6 @@
         OUT.redraw();
         bode.redraw();
 
-        headpoint_index += animation_speed;
         requestAnimationFrame(start_animation);
     }
 
@@ -720,17 +717,11 @@
         IN.set_mode(new_mode);
 
         OUT.recalculate();
-        headpoint_index = 0;
 
         if (was_not_animating) {
             start_animation();
         }
     }
-
-
-
-
-
 
     class GDescription {
         constructor(elem_to_fill) {
