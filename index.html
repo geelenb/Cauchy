@@ -131,36 +131,30 @@
     const sharpness = 3;
     const animation_speed = 2;
     const contour_length = 500;
-    // let scale = 75;
-    // const sharpness = 5;
-
     const in_ctx = document.getElementById('input_canvas').getContext('2d');
     const out_ctx = document.getElementById('output_canvas').getContext('2d');
     const rl_ctx = document.getElementById('rlocus_canvas').getContext('2d');
     const krange = document.getElementById('krange');
-    const k_pow_span = document.getElementById('k_pow_span');
 
-    let contour = [];
-
-    class Output {
+    class OutputCanvas {
         constructor(ctx) {
             this.ctx = ctx;
             this.plot = [];
         }
 
         recalculate() {
-            this.plot = contour.map(f);
+            this.plot = IN.contour.map(f);
         }
 
         draw_phasors() {
             const ctx = this.ctx;
-            if (contour.length === 0) {
+            if (this.plot.length === 0) {
                 return;
             }
             let sum_phase = 0;
             let r = 10 * sharpness;
 
-            const s = headpoint(contour);
+            const s = headpoint(IN.contour);
             ctx.save();
 
             ctx.strokeStyle = 'lightgrey';
@@ -210,9 +204,12 @@
             this.draw_phasors();
         }
 
+        center() {
+            this.ctx.translate(out_ctx.canvas.height / 2, out_ctx.canvas.height / 2);
+        }
     }
 
-    OUT = new Output(out_ctx);
+    OUT = new OutputCanvas(out_ctx);
 
     let headpoint_index = 0;
 
@@ -237,7 +234,7 @@
                 if (ctx === in_ctx || ctx === rl_ctx) {
                     in_ctx.translate(dx, dy);
                     rl_ctx.translate(dx, dy);
-                    redraw_in();
+                    IN.redraw();
                     RL.redraw();
                 } else {
                     ctx.translate(dx, dy);
@@ -324,12 +321,6 @@
             return;
         }
 
-        // if (window.mode === 'interactive') {
-        //     const n = points.length;
-        //     only plot last sqrt (length) items of points
-        // points = points.slice(Math.floor(n - Math.sqrt(n)));
-        // }
-
         points = points.map(s => [s.re * scale, -s.im * scale]);
 
         ctx.save();
@@ -391,55 +382,166 @@
     const mul = (a, b) => a.mul(b);
     const div = (a, b) => a.div(b);
 
-    function redraw_in() {
-        const draw_in_phasors = () => {
+    class InputCanvas {
+        constructor(ctx) {
+            this.ctx = ctx;
+            const canvas = ctx.canvas;
+
+            this.contour = [];
+
+            const pole_or_zero_clicked = (event) => {
+                const ctx = this.ctx;
+                if (ctx.canvas.isdragging) {
+                    return;
+                }
+
+                let poles_or_zeros = event.type === 'contextmenu' ? poles : zeros;
+                let clicked = this.coor_for_event(event);
+
+                // remove poles_or_zeros that are close to click
+                const pz_to_keep = poles_or_zeros.filter(z => clicked.sub(z).abs() > .2 && clicked.sub(z.conjugate()).abs() > .2);
+
+                if (pz_to_keep.length !== poles_or_zeros.length) {
+                    // remove the poles_or_zeros in-place:
+                    poles_or_zeros.splice(0, poles_or_zeros.length, ...pz_to_keep);
+                } else {
+                    // if no poles_or_zeros were removed: add one
+                    clicked = Complex(
+                        round_n(clicked.re, 1),
+                        round_n(clicked.im, 1)
+                    );
+                    poles_or_zeros.push(clicked);
+                    if (clicked.im !== 0) {
+                        poles_or_zeros.push(clicked.conjugate())
+                    }
+                }
+
+                RL.recalculate_root_lines();
+                IN.redraw();
+                OUT.recalculate();
+                OUT.redraw();
+                G_desc.update();
+                bode.recalculate();
+                bode.redraw();
+
+                event.preventDefault();
+            }
+
+            canvas.addEventListener('click', pole_or_zero_clicked);
+            canvas.addEventListener('contextmenu', pole_or_zero_clicked);
+
+            canvas.addEventListener('mousemove', (event) => {
+                if (window.mode === 'interactive') {
+                    const coor = this.coor_for_event(event, in_ctx);
+                    this.contour.push(coor);
+                    OUT.recalculate();
+
+                    IN.redraw();
+                    OUT.redraw();
+                }
+            });
+        }
+
+        draw_phasors() {
+            const ctx = this.ctx;
+            const contour = this.contour;
+
             if (contour.length === 0) {
                 return;
             }
 
             const s = headpoint(contour);
 
-            in_ctx.save();
+            ctx.save();
             const r = 10 * sharpness;
-            in_ctx.lineWidth = sharpness * 1;
-            in_ctx.strokeStyle = 'lightgrey';
+            ctx.lineWidth = sharpness * 1;
+            ctx.strokeStyle = 'lightgrey';
             poles.concat(zeros).forEach(c => {
-                in_ctx.beginPath();
-                in_ctx.moveTo(s.re * scale, -s.im * scale);
-                in_ctx.lineTo(c.re * scale, -c.im * scale);
-                in_ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s.re * scale, -s.im * scale);
+                ctx.lineTo(c.re * scale, -c.im * scale);
+                ctx.stroke();
             });
 
-            in_ctx.strokeStyle = 'red';
-            in_ctx.lineWidth = sharpness * 1;
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = sharpness * 1;
             poles.forEach(p => {
-                in_ctx.beginPath();
-                in_ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
-                in_ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
+                ctx.stroke();
             });
 
-            in_ctx.strokeStyle = 'darkgreen';
-            in_ctx.lineWidth = sharpness * 1;
+            ctx.strokeStyle = 'darkgreen';
+            ctx.lineWidth = sharpness * 1;
             zeros.forEach(z => {
-                in_ctx.beginPath();
-                in_ctx.arc(z.re * scale, -z.im * scale, r, -s.sub(z).arg(), 0);
-                in_ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(z.re * scale, -z.im * scale, r, -s.sub(z).arg(), 0);
+                ctx.stroke();
             });
 
-            in_ctx.restore()
+            ctx.restore()
         };
 
+        redraw() {
+            const ctx = this.ctx;
 
-        in_ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
-        add_axes(in_ctx);
+            ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
+            add_axes(ctx);
 
-        draw_points(in_ctx, contour);
+            draw_points(ctx, this.contour);
 
-        draw_in_phasors();
+            this.draw_phasors();
 
-        draw_poles(in_ctx);
-        draw_zeros(in_ctx);
+            draw_poles(ctx);
+            draw_zeros(ctx);
+        }
+
+        coor_for_event(event) {
+            const rect = this.ctx.canvas.getBoundingClientRect();
+            const point_unscaled = (this.ctx
+                    .getTransform()
+                    .inverse()
+                    .transformPoint({
+                        x: (event.clientX - rect.left) * sharpness,
+                        y: (event.clientY - rect.top) * sharpness
+                    })
+            );
+
+            return Complex(
+                point_unscaled.x,
+                -point_unscaled.y
+            ).div(scale)
+        }
+
+        circle_around(p) {
+            return math.range(0, math.tau, math.tau / contour_length).map(a => p.add({arg: -a, abs: 0.8})).toArray();
+        }
+
+        nyquist_contour() {
+            // const omegas = math.range(0, math.pi, .003).map(x => math.tan(x));
+            const omegas = math.range(-2, 2, 4 / (contour_length / 2)).map(x => math.pow(10, x)).toArray();
+            const omega_js = omegas.concat(...omegas.map(x => -1 / x)).map(o => Complex(0, o));
+            return omega_js;
+        }
+
+        set_mode(new_mode) {
+            if (new_mode === 'interactive') {
+                this.contour = [];
+            } else if (new_mode === 'zero') {
+                this.contour = this.circle_around(zeros[math.randomInt(zeros.length)]);
+            } else if (new_mode === 'pole') {
+                this.contour = this.circle_around(poles[math.randomInt(poles.length)]);
+            } else if (new_mode === 'nyquist') {
+                this.contour = this.nyquist_contour();
+            }
+        }
+
+        center() {
+            this.ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
+        }
     }
+
+    IN = new InputCanvas(in_ctx);
 
     function complex_rand() {
         return Complex(math.random() - .5, math.random() - .5);
@@ -577,6 +679,10 @@
             draw_poles(ctx);
             draw_zeros(ctx);
         }
+
+        center() {
+            this.ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
+        }
     }
 
     RL = new RootLocus(rl_ctx);
@@ -592,42 +698,14 @@
         return Math.round(x * p) / p
     }
 
-    function coor_for_event(event, ctx) {
-        const rect = ctx.canvas.getBoundingClientRect();
-        const point_unscaled = (ctx
-                .getTransform()
-                .inverse()
-                .transformPoint({
-                    x: (event.clientX - rect.left) * sharpness,
-                    y: (event.clientY - rect.top) * sharpness
-                })
-        );
-
-        return Complex(
-            point_unscaled.x,
-            -point_unscaled.y
-        ).div(scale)
-    }
-
-    function circle_around(p) {
-        return math.range(0, math.tau, math.tau / contour_length).map(a => p.add({arg: -a, abs: 0.8})).toArray();
-    }
-
-    function nyquist_contour() {
-        // const omegas = math.range(0, math.pi, .003).map(x => math.tan(x));
-        const omegas = math.range(-2, 2, 4 / (contour_length / 2)).map(x => math.pow(10, x)).toArray();
-        const omega_js = omegas.concat(...omegas.map(x => -1 / x)).map(o => Complex(0, o));
-        return omega_js;
-    }
 
     function start_animation() {
         if (window.mode === 'interactive') {
             return;
         }
 
-        redraw_in();
+        IN.redraw();
         OUT.redraw();
-
         bode.redraw();
 
         headpoint_index += animation_speed;
@@ -636,18 +714,10 @@
 
     function set_mode(new_mode) {
         const was_not_animating = window.mode === 'interactive';
-
         window.mode = new_mode;
 
-        if (new_mode === 'interactive') {
-            contour = [];
-        } else if (new_mode === 'zero') {
-            contour = circle_around(zeros[math.randomInt(zeros.length)]);
-        } else if (new_mode === 'pole') {
-            contour = circle_around(poles[math.randomInt(poles.length)]);
-        } else if (new_mode === 'nyquist') {
-            contour = nyquist_contour();
-        }
+
+        IN.set_mode(new_mode);
 
         OUT.recalculate();
         headpoint_index = 0;
@@ -657,55 +727,10 @@
         }
     }
 
-    in_ctx.canvas.addEventListener('mousemove', (event) => {
-        if (window.mode === 'interactive') {
-            const coor = coor_for_event(event, in_ctx);
-            contour.push(coor);
-            OUT.plot.push(f(coor));
 
-            redraw_in();
-            OUT.redraw();
-        }
-    });
 
-    function pole_or_zero_clicked(event) {
-        if (in_ctx.canvas.isdragging) {
-            return;
-        }
 
-        let poles_or_zeros = event.type === 'contextmenu' ? poles : zeros;
-        let clicked = coor_for_event(event, in_ctx);
 
-        // remove poles_or_zeros that are close to click
-        const pz_to_keep = poles_or_zeros.filter(z => clicked.sub(z).abs() > .2 && clicked.sub(z.conjugate()).abs() > .2);
-
-        if (pz_to_keep.length !== poles_or_zeros.length) {
-            // remove the poles_or_zeros in-place:
-            poles_or_zeros.splice(0, poles_or_zeros.length, ...pz_to_keep);
-        } else {
-            // if no poles_or_zeros were removed: add one
-            clicked = Complex(
-                round_n(clicked.re, 1),
-                round_n(clicked.im, 1)
-            );
-            poles_or_zeros.push(clicked);
-            if (clicked.im !== 0) {
-                poles_or_zeros.push(clicked.conjugate())
-            }
-        }
-
-        plot = contour.map(f);
-        RL.recalculate_root_lines();
-        redraw_in();
-        OUT.redraw();
-        G_desc.update();
-        event.preventDefault();
-        bode.recalculate();
-        bode.redraw();
-    }
-
-    in_ctx.canvas.addEventListener('click', pole_or_zero_clicked);
-    in_ctx.canvas.addEventListener('contextmenu', pole_or_zero_clicked);
 
     class GDescription {
         constructor(elem_to_fill) {
@@ -816,13 +841,35 @@
             return 180 * c.arg() / math.PI;
         }
 
+        unwrap_phases_inplace(degs) {
+            let running_add = 0;
+            for (let i = 1; i < degs.length; i++) {
+                degs[i] += running_add;
+                while (degs[i] - degs[i - 1] > 180) {
+                    degs[i] -= 360;
+                    running_add -= 360;
+                }
+                while (degs[i] - degs[i - 1] < -180) {
+                    degs[i] += 360;
+                    running_add += 360;
+                }
+            }
+        }
+
+        unwrap_phases(degs) {
+            const r = Array.from(degs);
+            this.unwrap_phases_inplace(r);
+            return r;
+        }
+
         recalculate() {
             const ctx = this.ctx;
 
             const plot = this.omega_js.map(f);
             const dbs = plot.map(this.complex_db);
-            const phases = plot.map(this.complex_deg);
-            // TODO: unwrap phases?
+
+            let phases = plot.map(this.complex_deg);
+            this.unwrap_phases_inplace(phases);
 
             const min_phase = math.min(...phases, 180);
             const max_phase = math.max(...phases, 180);
@@ -924,7 +971,7 @@
             const ctx = this.ctx;
             ctx.save();
 
-            const s = headpoint(contour);
+            const s = headpoint(IN.contour);
             const p = f(Complex(0, s.abs()));
             const x = this.omega_pow_to_x(math.log10(s.abs() + .0001));
             const deg_y = this.deg_to_y(this.complex_deg(p));
@@ -957,6 +1004,11 @@
             // TODO: margin lines?
         }
 
+        add_sketch_lines() {
+            // TODO: add sketch lines
+            // breaking points, etc.
+        }
+
         redraw() {
             const ctx = this.ctx;
 
@@ -982,6 +1034,7 @@
                 this.add_nyquist_helplines();
             } else {
                 this.add_margin_lines();
+                this.add_sketch_lines();
             }
 
             ctx.restore()
@@ -992,13 +1045,14 @@
 
     function k_changed() {
         K = Math.pow(10, krange.value);
-        k_pow_span.innerText = krange.value;
+        document.getElementById('k_pow_span').innerText = krange.value;
 
         OUT.recalculate();
-        OUT.redraw();
-        RL.redraw();
         G_desc.update_K();
         bode.recalculate();
+
+        OUT.redraw();
+        RL.redraw();
         bode.redraw();
     }
 
@@ -1014,17 +1068,15 @@
             canvas.style.height = w + 'px';
         });
 
-        in_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
-        out_ctx.translate(out_ctx.canvas.height / 2, out_ctx.canvas.height / 2);
-        rl_ctx.translate(out_ctx.canvas.height / 1.3, out_ctx.canvas.height / 2);
-
-        // scale = canvases[0].parentElement.clientWidth / 6;
-
-        redraw_in();
-        OUT.redraw();
-        RL.redraw();
+        IN.center();
+        OUT.center();
+        RL.center();
 
         bode.recalculate();
+
+        IN.redraw();
+        OUT.redraw();
+        RL.redraw();
         bode.redraw();
     }
 
@@ -1036,7 +1088,6 @@
 
     RL.recalculate_root_lines();
     G_desc.update();
-    k_changed();
     layoutchanged(); // calls redraw_all
 </script>
 </body>
