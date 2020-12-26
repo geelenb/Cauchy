@@ -140,87 +140,14 @@
     const rl_ctx = document.getElementById('rlocus_canvas').getContext('2d');
     const krange = document.getElementById('krange');
 
-    class OutputCanvas {
-        constructor(ctx) {
-            this.ctx = ctx;
-            this.plot = [];
-        }
-
-        recalculate() {
-            this.plot = IN.contour.map(f);
-        }
-
-        draw_phasors() {
-            const ctx = this.ctx;
-            if (this.plot.length === 0) {
-                return;
-            }
-            let sum_phase = 0;
-            let r = 10 * sharpness;
-
-            const s = headpoint(IN.contour);
-            ctx.save();
-
-            ctx.strokeStyle = 'lightgrey';
-            ctx.lineWidth = 1 * sharpness;
-            const fs = headpoint(this.plot);
-
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(fs.re * scale, -fs.im * scale);
-            ctx.stroke();
-
-            ctx.strokeStyle = 'darkgreen';
-
-            zeros.forEach(z => {
-                let phase = -s.sub(z).arg();
-
-                ctx.beginPath();
-                ctx.arc(0, 0, r, phase + sum_phase, sum_phase);
-                ctx.stroke();
-
-                sum_phase += phase;
-                r += 5 * sharpness;
-            });
-
-            ctx.strokeStyle = 'red';
-            poles.forEach(p => {
-                let phase = s.sub(p).arg();
-
-                ctx.beginPath();
-                ctx.arc(0, 0, r, sum_phase, phase + sum_phase);
-                ctx.stroke();
-
-                sum_phase += phase;
-                r += 5 * sharpness;
-            });
-
-            ctx.restore()
-        };
-
-        redraw() {
-            const ctx = this.ctx;
-            ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
-            add_axes(ctx);
-
-            draw_points(ctx, this.plot);
-
-            this.draw_phasors();
-        }
-
-        center() {
-            this.ctx.translate(out_ctx.canvas.height / 2, out_ctx.canvas.height / 2);
-        }
-    }
-
-    OUT = new OutputCanvas(out_ctx);
 
     const zeros = [Complex(-2)];
     const poles = [Complex(-1, 1), Complex(-1, -1)];
     let K = 1;
 
+    const mul = (a, b) => a.mul(b);
+
     function f(s) {
-        s = Complex(s);
         const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
         const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
         return counter.mul(K).div(denominator);
@@ -319,6 +246,7 @@
     }
 
     function draw_points(ctx, points) {
+        // TODO: move inside classes
         if (points.length === 0) {
             return;
         }
@@ -380,9 +308,6 @@
 
         ctx.restore();
     }
-
-    const mul = (a, b) => a.mul(b);
-    const div = (a, b) => a.div(b);
 
     class InputCanvas {
         constructor(ctx) {
@@ -545,9 +470,80 @@
 
     IN = new InputCanvas(in_ctx);
 
-    function complex_rand() {
-        return Complex(math.random() - .5, math.random() - .5);
+    class OutputCanvas {
+        constructor(ctx) {
+            this.ctx = ctx;
+            this.plot = [];
+        }
+
+        recalculate() {
+            this.plot = IN.contour.map(f);
+        }
+
+        draw_phasors() {
+            const ctx = this.ctx;
+            if (this.plot.length === 0) {
+                return;
+            }
+            let sum_phase = 0;
+            let r = 10 * sharpness;
+
+            const s = headpoint(IN.contour);
+            ctx.save();
+
+            ctx.strokeStyle = 'lightgrey';
+            ctx.lineWidth = 1 * sharpness;
+            const fs = headpoint(this.plot);
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(fs.re * scale, -fs.im * scale);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'darkgreen';
+
+            zeros.forEach(z => {
+                let phase = -s.sub(z).arg();
+
+                ctx.beginPath();
+                ctx.arc(0, 0, r, phase + sum_phase, sum_phase);
+                ctx.stroke();
+
+                sum_phase += phase;
+                r += 5 * sharpness;
+            });
+
+            ctx.strokeStyle = 'red';
+            poles.forEach(p => {
+                let phase = s.sub(p).arg();
+
+                ctx.beginPath();
+                ctx.arc(0, 0, r, sum_phase, phase + sum_phase);
+                ctx.stroke();
+
+                sum_phase += phase;
+                r += 5 * sharpness;
+            });
+
+            ctx.restore()
+        };
+
+        redraw() {
+            const ctx = this.ctx;
+            ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
+            add_axes(ctx);
+
+            draw_points(ctx, this.plot);
+
+            this.draw_phasors();
+        }
+
+        center() {
+            this.ctx.translate(out_ctx.canvas.height / 2, out_ctx.canvas.height / 2);
+        }
     }
+
+    OUT = new OutputCanvas(out_ctx);
 
     class RootLocus {
         constructor(ctx) {
@@ -555,6 +551,10 @@
             this.n_ks = 3000;
             this.max_exponent = 2;
             this.root_lines = [];
+        }
+
+        complex_rand() {
+            return Complex(math.random() - .5, math.random() - .5);
         }
 
         increase_K_resolution() {
@@ -588,7 +588,7 @@
                 }
 
                 if (est === undefined) {
-                    est = Array(poly.degree()).fill().map(complex_rand)
+                    est = Array(poly.degree()).fill().map(this.complex_rand)
                 }
 
                 poly.complexRoots(est).root.forEach(root => roots.push(root));
@@ -627,7 +627,7 @@
 
                 const poly = counter.mul(K).add(denominator).monic();
 
-                const est = Array(poly.degree()).fill(0).map(complex_rand);
+                const est = Array(poly.degree()).fill(0).map(this.complex_rand);
                 poly.complexRoots(est).root.forEach(root => {
                     let [x, y] = root.mul(scale).toVector();
 
@@ -699,7 +699,6 @@
         let p = Math.pow(10, n);
         return Math.round(x * p) / p
     }
-
 
     function start_animation() {
         if (window.mode === 'interactive') {
@@ -808,8 +807,8 @@
 
             this.ctx = ctx;
 
-            this.min_omega_pow = -3;
-            this.max_omega_pow = 3;
+            this.min_omega_pow = -2;
+            this.max_omega_pow = 2;
             const n_x = 100;
 
             this.omega_pows = math.range(
@@ -995,13 +994,38 @@
             ctx.restore();
         }
 
-        add_margin_lines() {
-            // TODO: margin lines?
-        }
-
         add_sketch_lines() {
-            // TODO: add sketch lines
-            // breaking points, etc.
+            // Type of the system l
+            const l = poles.filter(p => p.equals(Complex.ZERO)).length -
+                zeros.filter(z => z.equals(Complex.ZERO)).length;
+
+            const pz_merged_sorted = [...poles, ...zeros].sort((a, b) => (a.abs() < b.abs()));
+
+            const ctx = this.ctx;
+            ctx.save();
+            ctx.strokeStyle = 'gray';
+            ctx.lineWidth = .5 * sharpness;
+            pz_merged_sorted.forEach(p => {
+                const omega_n = p.abs();
+                if (p.im < 0) {
+                    return;
+                }
+
+                // todo: kleur (pool: rood, np: blauw)
+                // todo: "running" sketch
+
+                const x = this.omega_pow_to_x(math.log10(omega_n));
+                ctx.beginPath();
+                ctx.moveTo(x, this.phase_bottom);
+                ctx.lineTo(x, this.phase_top);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(x, this.mag_bottom);
+                ctx.lineTo(x, this.mag_top);
+                ctx.stroke();
+            });
+            ctx.restore();
         }
 
         redraw() {
@@ -1028,7 +1052,6 @@
             if (mode === 'nyquist') {
                 this.add_nyquist_helplines();
             } else {
-                this.add_margin_lines();
                 this.add_sketch_lines();
             }
 
@@ -1038,7 +1061,9 @@
 
     bode = new BodePlot(document.getElementById('bode_canvas').getContext('2d'));
 
-    function k_changed() {
+
+    krange.addEventListener('input', () => {
+        // K changed
         K = Math.pow(10, krange.value);
         document.getElementById('k_pow_span').innerText = krange.value;
 
@@ -1049,9 +1074,7 @@
         OUT.redraw();
         RL.redraw();
         bode.redraw();
-    }
-
-    krange.addEventListener('input', k_changed);
+    });
 
     function layoutchanged() {
         let canvases = document.querySelectorAll('canvas');
@@ -1091,5 +1114,14 @@
 TODO:
 - op welk punt staat de muis?
 - tabel met np en polen
+    - 2 tabellen (np & polen)
+    - 4 kolommen:
+        - re
+        - im
+    - 1 rij per polenpaar / paar np op reele as
+        - \pm
+    - cellen zijn content-editable
+    - wanneer geklikt; slidertje
+    - geen borders
 -->
 </html>
