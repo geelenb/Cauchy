@@ -38,6 +38,10 @@
             box-shadow: none;
         }
 
+        p#G_equation table {
+            margin: 0 auto;
+        }
+
         table.equationtable {
             border-collapse: collapse;
         }
@@ -52,6 +56,25 @@
 
         p, div {
             font-family: Optima, sans-serif;
+        }
+
+        #pz_table {
+            text-align: left;
+        }
+
+        #pz_table details > div {
+            display: grid;
+            grid-template-columns: 5ex auto 5ex;
+            grid-column-gap: 1ex;
+            margin-top: .5em;
+        }
+
+        #pz_table input {
+            height: 1.5em;
+        }
+
+        #pz_table p {
+            margin: 0;
         }
     </style>
 
@@ -75,7 +98,7 @@
     </div>
     <br>
     <input id="krange" max="2" min="-2" step='.01' style="width: 250px; min-width: 50%; max-width: 100%;" type="range">
-    <p id="G_equation"></p>
+    <p id="pz_table"></p>
 </div>
 
 <div class="column">
@@ -90,20 +113,24 @@
         Use the following buttons to specify the interaction mode:
     </p>
     <p style="text-align: left">
-        <input checked id="radiobutton_zero" name="interactiontype" onclick="set_mode('zero')" type="radio">
+        <input checked id="radiobutton_origin" name="interactiontype" onclick="set_mode('origin')"
+               type="radio">
+        <label for="radiobutton_origin">Interactive</label><br>
+        <input id="radiobutton_interactive" name="interactiontype" onclick="set_mode('interactive')"
+               type="radio">
+        <label for="radiobutton_interactive">Interactive</label><br>
+        <input id="radiobutton_zero" name="interactiontype" onclick="set_mode('zero')" type="radio">
         <label for="radiobutton_zero">Orbit a zero</label><br>
         <input id="radiobutton_pole" name="interactiontype" onclick="set_mode('pole')" type="radio">
         <label for="radiobutton_pole">Orbit a pole</label><br>
         <input id="radiobutton_nyquist" name="interactiontype" onclick="set_mode('nyquist')" type="radio">
         <label for="radiobutton_nyquist">Nyquist contour</label><br>
-        <input id="radiobutton_interactive" name="interactiontype" onclick="set_mode('interactive')"
-               type="radio">
-        <label for="radiobutton_interactive">Interactive</label><br>
     </p>
 </div>
 <div class="column">
     <h3>Bode Plot</h3>
     <canvas id="bode_canvas"></canvas>
+    <p id="G_equation"></p>
 </div>
 <div class="column">
     <h3>Root locus</h3>
@@ -246,7 +273,7 @@
     }
 
     function draw_points(ctx, points) {
-        // TODO: move inside classes
+        // TODO: move inside classes?
         if (points.length === 0) {
             return;
         }
@@ -255,10 +282,10 @@
 
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(...(points[0]));
 
         ctx.strokeStyle = 'cyan';
         ctx.lineWidth = sharpness * 1;
+        ctx.moveTo(...(points[0]));
         points.forEach(point => {
             ctx.lineTo(...point);
         });
@@ -350,6 +377,7 @@
                 G_desc.update();
                 bode.recalculate();
                 bode.redraw();
+                PZT.update();
 
                 event.preventDefault();
             };
@@ -369,55 +397,53 @@
             });
         }
 
-        draw_phasors() {
+        redraw() {
             const ctx = this.ctx;
             const contour = this.contour;
 
-            if (contour.length === 0) {
-                return;
-            }
+            const draw_phasors = () => {
+                if (contour.length === 0) {
+                    return;
+                }
 
-            const s = headpoint(contour);
+                const s = headpoint(contour);
 
-            ctx.save();
-            const r = 10 * sharpness;
-            ctx.lineWidth = sharpness * 1;
-            ctx.strokeStyle = 'lightgrey';
-            poles.concat(zeros).forEach(c => {
-                ctx.beginPath();
-                ctx.moveTo(s.re * scale, -s.im * scale);
-                ctx.lineTo(c.re * scale, -c.im * scale);
-                ctx.stroke();
-            });
+                ctx.save();
+                const r = 10 * sharpness;
+                ctx.lineWidth = sharpness * 1;
+                ctx.strokeStyle = 'lightgrey';
+                poles.concat(zeros).forEach(c => {
+                    ctx.beginPath();
+                    ctx.moveTo(s.re * scale, -s.im * scale);
+                    ctx.lineTo(c.re * scale, -c.im * scale);
+                    ctx.stroke();
+                });
 
-            ctx.strokeStyle = 'red';
-            ctx.lineWidth = sharpness * 1;
-            poles.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
-                ctx.stroke();
-            });
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = sharpness * 1;
+                poles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.re * scale, -p.im * scale, r, -s.sub(p).arg(), 0);
+                    ctx.stroke();
+                });
 
-            ctx.strokeStyle = 'darkgreen';
-            ctx.lineWidth = sharpness * 1;
-            zeros.forEach(z => {
-                ctx.beginPath();
-                ctx.arc(z.re * scale, -z.im * scale, r, -s.sub(z).arg(), 0);
-                ctx.stroke();
-            });
+                ctx.strokeStyle = 'darkgreen';
+                ctx.lineWidth = sharpness * 1;
+                zeros.forEach(z => {
+                    ctx.beginPath();
+                    ctx.arc(z.re * scale, -z.im * scale, r, -s.sub(z).arg(), 0);
+                    ctx.stroke();
+                });
 
-            ctx.restore()
-        };
-
-        redraw() {
-            const ctx = this.ctx;
+                ctx.restore()
+            };
 
             ctx.clearRect(-1000 * sharpness, -1000 * sharpness, 2000 * sharpness, 2000 * sharpness);
             add_axes(ctx);
 
             draw_points(ctx, this.contour);
 
-            this.draw_phasors();
+            draw_phasors();
 
             draw_poles(ctx);
             draw_zeros(ctx);
@@ -454,6 +480,8 @@
         set_mode(new_mode) {
             if (new_mode === 'interactive') {
                 this.contour = [];
+            } else if (new_mode === 'origin') {
+                this.contour = [Complex(0, 0)];
             } else if (new_mode === 'zero') {
                 this.contour = this.circle_around(zeros[math.randomInt(zeros.length)]);
             } else if (new_mode === 'pole') {
@@ -1014,6 +1042,137 @@
         }
     }
 
+    class PZ_Table {
+        constructor(elem_to_fill) {
+            this.root = elem_to_fill;
+        }
+
+        update() {
+            const table_for_list = (list) => {
+                const details_list = list.filter(p => p.im >= 0).map(p => {
+                    const details = document.createElement('details');
+                    // details.open = true;
+                    const arg = p.arg() / math.PI * 180;
+                    if (p.im === 0) {
+                        details.innerHTML = [
+                            '<summary>',
+                            p.toString(),
+                            '</summary>',
+                            '<div>',
+                            '<p>Value</p>',
+                            `<input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">`,
+                            `<input type="text" value="${p.re}" concept="re">`,
+                            '</div>',
+                        ].join('');
+                    } else {
+                        details.innerHTML = [
+                            '<summary>',
+                            p.toString().replace('+', '±'),
+                            '</summary>',
+                            '<div>',
+                            '<p>Real</p>',
+                            `<input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">`,
+                            `<input type="text" value="${p.re}" concept="re">`,
+                            '<p>Imag</p>',
+                            `<input type="range" value="${p.im}" concept="im" min="0" max="10" step=".1">`,
+                            `<input type="text" value="${p.im}" concept="im">`,
+                            '<p>Mod</p>',
+                            `<input type="range" value="${p.abs()}" concept="abs" min="0" max="10" step=".1">`,
+                            `<input type="text" value="${p.abs()}" concept="abs">`,
+                            '<p>Arg</p>',
+                            `<input type="range" value="${arg}" concept="arg" min="0" max="180" step="1">`,
+                            `<input type="text" value="${arg}" concept="arg">`,
+                            '</div>',
+                        ].join('');
+                    }
+                    details.querySelectorAll('input').forEach(input => {
+                        input.p = p;
+                    });
+
+                    details.p = p;
+
+                    return details;
+                });
+
+                list.filter(p => p.im < 0).forEach(p => {
+                    const details = details_list.find(summ => summ.p.conjugate().equals(p));
+                    details.querySelectorAll('input').forEach(input => {
+                        input.conj = p;
+                    });
+                });
+
+                return details_list;
+            };
+
+            this.root.innerHTML = '<h3>Zeros</h3>';
+            table_for_list(zeros).forEach(t => this.root.appendChild(t));
+            this.root.insertAdjacentHTML('beforeend', '<h3>Poles</h3>');
+            table_for_list(poles).forEach(t => this.root.appendChild(t));
+
+            this.add_eventlisteners();
+        }
+
+        add_eventlisteners() {
+            const set_complex = (old, new_) => {
+                old.re = new_.re;
+                old.im = new_.im;
+            };
+
+            this.root.querySelectorAll('input').forEach(input => {
+                const details = input.closest('details');
+                const summary = details.getElementsByTagName('summary')[0];
+                input.addEventListener('input', event => {
+                    if (input.type === 'range') {
+                        input.nextElementSibling.value = input.value;
+                    } else if (input.type === 'text') {
+                        input.previousElementSibling.value = input.value;
+                    }
+
+                    const concept = input.attributes['concept'].value;
+                    if (input.conj !== undefined) {
+                        let new_p;
+                        // pole or zero PAIR; update both
+                        if (concept == 'abs' || concept == 'arg') {
+                            new_p = Complex({
+                                arg: details.querySelector('input[concept=arg]').value * math.PI / 180,
+                                abs: details.querySelector('input[concept=abs]').value,
+                            });
+                        } else {
+                            new_p = Complex(
+                                details.querySelector('input[concept=re]').value,
+                                details.querySelector('input[concept=im]').value,
+                            );
+                        }
+
+                        set_complex(input.p, new_p);
+                        set_complex(input.conj, new_p.conjugate());
+                        summary.innerHTML = new_p.toString().replace('+', '±');
+                    } else {
+                        input.p.re = input.value;
+                        summary.innerHTML = input.value;
+                    }
+
+                    if (input.type !== 'range') {
+                        // text input
+                        RL.recalculate_root_lines();
+                    }
+                    IN.redraw();
+                    OUT.recalculate();
+                    OUT.redraw();
+                    G_desc.update();
+                    bode.recalculate();
+                    bode.redraw();
+                });
+
+                if (input.type === 'range') {
+                    input.addEventListener('mouseup', () => {
+                        RL.recalculate_root_lines();
+                    })
+                }
+            })
+        }
+    }
+
     /**
      * Round to n decimals after point
      * @param x
@@ -1038,9 +1197,8 @@
     }
 
     function set_mode(new_mode) {
-        const was_not_animating = window.mode === 'interactive';
+        const was_not_animating = window.mode === 'interactive' || window.mode === 'origin';
         window.mode = new_mode;
-
 
         IN.set_mode(new_mode);
 
@@ -1051,12 +1209,12 @@
         }
     }
 
-
     IN = new InputCanvas(in_ctx);
     OUT = new OutputCanvas(out_ctx);
     RL = new RootLocus(rl_ctx);
     G_desc = new GDescription(document.getElementById('G_equation'));
     bode = new BodePlot(document.getElementById('bode_canvas').getContext('2d'));
+    PZT = new PZ_Table(document.getElementById('pz_table'));
 
     krange.addEventListener('input', () => {
         // K changed
@@ -1096,12 +1254,13 @@
 
     window.addEventListener('resize', layoutchanged);
 
-    set_mode('zero'); // will not start animation on first call
-    // set_mode('nyquist'); // will not start animation on first call
-    start_animation();
+    set_mode('origin');
+    // set_mode('nyquist'); // will not start animation on first call!
+    // start_animation();
 
     RL.recalculate_root_lines();
     G_desc.update();
+    PZT.update();
     layoutchanged(); // calls redraw_all
 </script>
 </body>
