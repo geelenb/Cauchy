@@ -88,10 +88,9 @@
 
 <div class="column">
     <h3>s-plane</h3>
-    <canvas id="input_canvas" style="/* cursor: none */"></canvas>
+    <canvas id="input_canvas"></canvas>
     <p>
-        This is the input screen, showing the poles and zeros of the function G(s).
-        Add or remove zeros and poles to G by left- and right-clicking.
+        Add or remove zeros and poles by left- and right-clicking.
     </p>
     <div style="width: 11ch; display: inline-block; text-align: left;">
         K = 10<sup><span id="k_pow_span"></span></sup>
@@ -107,15 +106,14 @@
     <p>
         The blue point s is mapped to the w-plane by the function KG(s).
         Similarly, a contour is mapped to a plot.
-        Note that you can scale this plot by modifying K.
     </p>
     <p>
-        Use the following buttons to specify the interaction mode:
+        Interaction mode:
     </p>
     <p style="text-align: left">
         <input checked id="radiobutton_origin" name="interactiontype" onclick="set_mode('origin')"
                type="radio">
-        <label for="radiobutton_origin">Interactive</label><br>
+        <label for="radiobutton_origin">s = 0</label><br>
         <input id="radiobutton_interactive" name="interactiontype" onclick="set_mode('interactive')"
                type="radio">
         <label for="radiobutton_interactive">Interactive</label><br>
@@ -1137,11 +1135,15 @@
                                 arg: details.querySelector('input[concept=arg]').value * math.PI / 180,
                                 abs: details.querySelector('input[concept=abs]').value,
                             });
+                            details.querySelectorAll('input[concept=re]').forEach(input => input.value = new_p.re);
+                            details.querySelectorAll('input[concept=im]').forEach(input => input.value = new_p.im);
                         } else {
                             new_p = Complex(
                                 details.querySelector('input[concept=re]').value,
                                 details.querySelector('input[concept=im]').value,
                             );
+                            details.querySelectorAll('input[concept=arg]').forEach(input => input.value = new_p.arg() * 180 / math.PI);
+                            details.querySelectorAll('input[concept=abs]').forEach(input => input.value = new_p.abs());
                         }
 
                         set_complex(input.p, new_p);
@@ -1268,16 +1270,6 @@
 <!--
 TODO:
 - op welk punt staat de muis?
-- tabel met np en polen
-    - 2 tabellen (np & polen)
-    - 4 kolommen:
-        - re
-        - im
-    - 1 rij per polenpaar / paar np op reele as
-        - \pm &#177;
-    - cellen zijn content-editable
-    - wanneer geklikt; slidertje
-    - geen borders
 - disable stuff
     - hide bode plot
     - hide root locus button
