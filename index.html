@@ -117,9 +117,9 @@
         <input id="radiobutton_interactive" name="interactiontype" onclick="set_mode('interactive')"
                type="radio">
         <label for="radiobutton_interactive">Interactive</label><br>
-        <input id="radiobutton_zero" name="interactiontype" onclick="set_mode('zero')" type="radio">
+        <input id="radiobutton_zero" name="interactiontype" onclick="set_mode('orbit_zero')" type="radio">
         <label for="radiobutton_zero">Orbit a zero</label><br>
-        <input id="radiobutton_pole" name="interactiontype" onclick="set_mode('pole')" type="radio">
+        <input id="radiobutton_pole" name="interactiontype" onclick="set_mode('orbit_pole')" type="radio">
         <label for="radiobutton_pole">Orbit a pole</label><br>
         <input id="radiobutton_nyquist" name="interactiontype" onclick="set_mode('nyquist')" type="radio">
         <label for="radiobutton_nyquist">Nyquist contour</label><br>
@@ -480,9 +480,9 @@
                 this.contour = [];
             } else if (new_mode === 'origin') {
                 this.contour = [Complex(0, 0)];
-            } else if (new_mode === 'zero') {
+            } else if (new_mode === 'orbit_zero') {
                 this.contour = this.circle_around(zeros[math.randomInt(zeros.length)]);
-            } else if (new_mode === 'pole') {
+            } else if (new_mode === 'orbit_pole') {
                 this.contour = this.circle_around(poles[math.randomInt(poles.length)]);
             } else if (new_mode === 'nyquist') {
                 this.contour = this.nyquist_contour();
@@ -1150,7 +1150,7 @@
                         set_complex(input.conj, new_p.conjugate());
                         summary.innerHTML = new_p.toString().replace('+', '±');
                     } else {
-                        input.p.re = input.value;
+                        input.p.re = parseFloat(input.value);
                         summary.innerHTML = input.value;
                     }
 
