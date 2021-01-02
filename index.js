@@ -1054,12 +1054,12 @@ function set_mode(new_mode) {
     }
 }
 
-IN = new InputCanvas(in_ctx);
-OUT = new OutputCanvas(out_ctx);
-RL = new RootLocus(rl_ctx);
-G_desc = new GDescription(document.getElementById('G_equation'));
-bode = new BodePlot(document.getElementById('bode_canvas').getContext('2d'));
-PZT = new PZ_Table(document.getElementById('pz_table'));
+const IN = new InputCanvas(in_ctx);
+const OUT = new OutputCanvas(out_ctx);
+const RL = new RootLocus(rl_ctx);
+const G_desc = new GDescription(document.getElementById('G_equation'));
+const bode = new BodePlot(document.getElementById('bode_canvas').getContext('2d'));
+const PZT = new PZ_Table(document.getElementById('pz_table'));
 
 krange.addEventListener('input', () => {
     // K changed
