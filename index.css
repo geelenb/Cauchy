@@ -1,0 +1,72 @@
+body {
+    margin: 0;
+}
+
+body > h1 {
+    text-align: center;
+    grid-area: top / left / 2 / right;
+}
+
+body > div.column {
+    text-align: center;
+    width: 23vw;
+    float: left;
+    margin: 0 1vw;
+}
+
+body > div#credits {
+    clear: both;
+    width: 100%;
+}
+
+canvas {
+    box-shadow: grey 2px 2px 4px;
+    border-radius: 6px;
+}
+
+canvas#input_canvas {
+    cursor: crosshair;
+}
+
+canvas#bode_canvas {
+    box-shadow: none;
+}
+
+p#G_equation table {
+    margin: 0 auto;
+}
+
+table.equationtable {
+    border-collapse: collapse;
+}
+
+table.equationtable td.counter {
+    border-bottom: 1px solid black;
+}
+
+h1, h2, h3 {
+    font-family: Futura, Helvetica, "Helvetica Neue", sans-serif;
+}
+
+p, div {
+    font-family: Optima, sans-serif;
+}
+
+#pz_table {
+    text-align: left;
+}
+
+#pz_table details > div {
+    display: grid;
+    grid-template-columns: 5ex auto 5ex;
+    grid-column-gap: 1ex;
+    margin-top: .5em;
+}
+
+#pz_table input {
+    height: 1.5em;
+}
+
+#pz_table p {
+    margin: 0;
+}
