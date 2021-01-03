@@ -449,8 +449,9 @@ class RootLocus {
 
         let roots_per_K;
 
-        const max_diff_abs = () => math.max(roots_per_K[roots_per_K.length - 1].map(
-            (root, i) => root.sub(roots_per_K[roots_per_K.length - 2][i]).abs()))
+        const max_diff_abs = (l) => math.max(l[l.length - 1].map(
+            (root, i) => root.sub(l[l.length - 2][i]).abs()));
+
 
         if (order === 1) {
             roots_per_K = [
@@ -458,7 +459,7 @@ class RootLocus {
                 [poles[0] || Complex(-1000)]
             ];
         } else if (order === 2) {
-            const wanted_abs_diff = .03;
+            const wanted_abs_diff = .05;
             roots_per_K = [];
 
             const coeff_full = (poly, n) => new Array(n).fill().map(
@@ -469,10 +470,9 @@ class RootLocus {
             // use quadratic formula to estimate roots
             const max_k = math.pow(10, max_exponent);
 
-            let k_multiplier = 1.003;
+            let k_multiplier = math.pow(10, max_exponent * 2 / n_ks);
 
             for (let k = 1 / max_k, i = 0; k < max_k; k *= k_multiplier, i++) {
-                // roots_per_K = ks.map(K => {
                 const a = counter_arr[2] * k + denominator_arr[2];
                 const b = counter_arr[1] * k + denominator_arr[1];
                 const c = counter_arr[0] * k + denominator_arr[0];
@@ -487,16 +487,14 @@ class RootLocus {
                     // console.log('i', i);
                     // console.log('wanted_abs_diff', wanted_abs_diff);
                     // console.log('max_diff_abs', max_diff_abs());
+
                     // console.log('/', wanted_abs_diff / max_diff_abs());
+                    // const abs_diff = max_diff_abs(roots_per_K)
+                    // k_multiplier *= math.pow(abs_diff / wanted_abs_diff, .001);
+                    // k_multiplier = math.max(1.0001, k_multiplier); // multiplier must always > 1
 
-                    k_multiplier = math.log10(k_multiplier);
+                    // console.log(math.log10(k_multiplier));
 
-                    k_multiplier += math.log10(wanted_abs_diff / max_diff_abs()) * .01;
-
-                    k_multiplier = math.max(.0001, k_multiplier); // multiplier must always > 1, so log must always > 0
-                    k_multiplier = math.pow(10, k_multiplier);
-
-                    console.log(math.log10(k_multiplier));
                 }
             }
 
@@ -592,7 +590,7 @@ class RootLocus {
             this.root_lines.forEach(root_line => {
                 const points = root_line.map(s => s.mul(scale).toVector());
 
-                if (false) {
+                if (true) { // TODO: put on true
                     // draw lines
                     ctx.beginPath();
                     ctx.moveTo(...(points[0]));
@@ -606,7 +604,7 @@ class RootLocus {
                     points.forEach(point => {
                         ctx.fillStyle = ctx.strokeStyle;
                         ctx.beginPath();
-                        ctx.arc(point[0], point[1], 1 * sharpness, 0, math.tau);
+                        ctx.arc(point[0], point[1], 2 * sharpness, 0, math.tau);
                         ctx.fill();
                     });
                 }
