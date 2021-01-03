@@ -442,43 +442,42 @@ class RootLocus {
         // 1 + KP = 0
         // P = counter / denominator
         // denominator + K counter = 0
-        console.log('calculating root lines');
 
         const counter = Polynomial.fromRoots(zeros).monic();
         const denominator = Polynomial.fromRoots(poles).monic();
-        const use_quadratic = zeros.length <= 2 && poles.length <= 2;
-
+        const order = Math.max(zeros.length, poles.length);
 
         let roots_per_K;
-
-        if (use_quadratic) {
+        if (order === 1) {
+            roots_per_K = [
+                [zeros[0] || Complex(-1000)],
+                [poles[0] || Complex(-1000)]
+            ];
+        } else if (order === 2) {
             const ks = math.range(0, n_ks + 1).toArray()
                 .map(i => Math.pow(10, (i / n_ks - .5) * 2 * max_exponent));
 
-            const ca = (counter.coeff[2] || {}).re || 0;
-            const cb = (counter.coeff[1] || {}).re || 0;
-            const cc = (counter.coeff[0] || {}).re || 0;
-            const da = (denominator.coeff[2] || {}).re || 0;
-            const db = (denominator.coeff[1] || {}).re || 0;
-            const dc = (denominator.coeff[0] || {}).re || 0;
+            // debugger;
+            const coeff_full = (poly, n) => new Array(n).fill().map(
+                (_, i) => (poly.coeff[i] || {}).re || 0);
+            const counter_arr = coeff_full(counter, 3);
+            const denominator_arr = coeff_full(denominator, 3);
 
             // use quadratic formula to estimate roots
             roots_per_K = ks.map(K => {
-                // const poly = counter.mul(K).add(denominator).monic();
-
-                const a = ca * K + da;
-                const b = cb * K + db;
-                const c = cc * K + dc;
+                const a = counter_arr[2] * K + denominator_arr[2];
+                const b = counter_arr[1] * K + denominator_arr[1];
+                const c = counter_arr[0] * K + denominator_arr[0];
 
                 const D = Complex(b * b - 4 * a * c);
                 return [
                     D.sqrt().add(-b).mul(1 / 2 / a),
                     D.sqrt().add(b).mul(-1 / 2 / a)
                 ];
-            })
+            });
 
         } else {
-            // use newton-rhapson with estimates
+            console.log('calculating root lines using newton-rhapson');
             roots_per_K = new Array(n_ks);
 
             const calculate_roots = (poly, est) => {
@@ -1120,9 +1119,6 @@ document.querySelectorAll('input[name=interactiontype]').forEach(i => {
         }
     );
 });
-
-document.getElementById('increase_range').addEventListener('click', () => RL.increase_K_range());
-document.getElementById('increase_resolution').addEventListener('click', () => RL.increase_K_resolution());
 
 function layoutchanged() {
     let canvases = document.querySelectorAll('canvas');
