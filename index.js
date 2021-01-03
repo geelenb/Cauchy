@@ -448,33 +448,59 @@ class RootLocus {
         const order = Math.max(zeros.length, poles.length);
 
         let roots_per_K;
+
+        const max_diff_abs = () => math.max(roots_per_K[roots_per_K.length - 1].map(
+            (root, i) => root.sub(roots_per_K[roots_per_K.length - 2][i]).abs()))
+
         if (order === 1) {
             roots_per_K = [
                 [zeros[0] || Complex(-1000)],
                 [poles[0] || Complex(-1000)]
             ];
         } else if (order === 2) {
-            const ks = math.range(0, n_ks + 1).toArray()
-                .map(i => Math.pow(10, (i / n_ks - .5) * 2 * max_exponent));
+            const wanted_abs_diff = .03;
+            roots_per_K = [];
 
-            // debugger;
             const coeff_full = (poly, n) => new Array(n).fill().map(
                 (_, i) => (poly.coeff[i] || {}).re || 0);
             const counter_arr = coeff_full(counter, 3);
             const denominator_arr = coeff_full(denominator, 3);
 
             // use quadratic formula to estimate roots
-            roots_per_K = ks.map(K => {
-                const a = counter_arr[2] * K + denominator_arr[2];
-                const b = counter_arr[1] * K + denominator_arr[1];
-                const c = counter_arr[0] * K + denominator_arr[0];
+            const max_k = math.pow(10, max_exponent);
+
+            let k_multiplier = 1.003;
+
+            for (let k = 1 / max_k, i = 0; k < max_k; k *= k_multiplier, i++) {
+                // roots_per_K = ks.map(K => {
+                const a = counter_arr[2] * k + denominator_arr[2];
+                const b = counter_arr[1] * k + denominator_arr[1];
+                const c = counter_arr[0] * k + denominator_arr[0];
 
                 const D = Complex(b * b - 4 * a * c);
-                return [
+                roots_per_K.push([
                     D.sqrt().add(-b).mul(1 / 2 / a),
                     D.sqrt().add(b).mul(-1 / 2 / a)
-                ];
-            });
+                ]);
+
+                if (i > 0) {
+                    // console.log('i', i);
+                    // console.log('wanted_abs_diff', wanted_abs_diff);
+                    // console.log('max_diff_abs', max_diff_abs());
+                    // console.log('/', wanted_abs_diff / max_diff_abs());
+
+                    k_multiplier = math.log10(k_multiplier);
+
+                    k_multiplier += math.log10(wanted_abs_diff / max_diff_abs()) * .01;
+
+                    k_multiplier = math.max(.0001, k_multiplier); // multiplier must always > 1, so log must always > 0
+                    k_multiplier = math.pow(10, k_multiplier);
+
+                    console.log(math.log10(k_multiplier));
+                }
+            }
+
+            console.log('roots_per_K.length', roots_per_K.length)
 
         } else {
             console.log('calculating root lines using newton-rhapson');
@@ -560,18 +586,31 @@ class RootLocus {
         const draw_root_lines = () => {
             ctx.save();
             ctx.strokeStyle = 'blue';
+            ctx.fillStyle = 'blue';
             ctx.lineWidth = sharpness * 2;
 
             this.root_lines.forEach(root_line => {
                 const points = root_line.map(s => s.mul(scale).toVector());
 
-                ctx.beginPath();
-                ctx.moveTo(...(points[0]));
-                points.forEach(point => {
-                    ctx.lineTo(...point);
-                });
+                if (false) {
+                    // draw lines
+                    ctx.beginPath();
+                    ctx.moveTo(...(points[0]));
+                    points.forEach(point => {
+                        ctx.lineTo(...point);
+                    });
+                    ctx.stroke();
+                } else {
+                    // draw dots
 
-                ctx.stroke();
+                    points.forEach(point => {
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.beginPath();
+                        ctx.arc(point[0], point[1], 1 * sharpness, 0, math.tau);
+                        ctx.fill();
+                    });
+                }
+
 
             });
             ctx.restore();
