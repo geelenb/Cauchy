@@ -212,7 +212,7 @@ class InputCanvas {
                 }
             }
 
-            RL.recalculate_root_lines();
+            RL.recalculate_accurately();
             IN.redraw();
             OUT.recalculate();
             OUT.redraw();
@@ -413,8 +413,6 @@ class OutputCanvas {
 class RootLocus {
     constructor(ctx) {
         this.ctx = ctx;
-        this.n_ks = 3000;
-        this.max_exponent = 2;
         this.root_lines = [];
     }
 
@@ -422,54 +420,98 @@ class RootLocus {
         return Complex(math.random() - .5, math.random() - .5);
     }
 
-    increase_K_resolution() {
-        this.n_ks *= 2;
-        this.recalculate_root_lines();
+    recalculate_quickly() {
+        if (zeros.length <= 2 && poles.length <= 2) {
+            this.recalculate_root_lines(1000, 1.5);
+        } else {
+            const max_exponent = math.sqrt(math.max(zeros.length, poles.length));
+            this.recalculate_root_lines(1000, max_exponent);
+        }
     }
 
-    increase_K_range() {
-        this.max_exponent += 1;
-        this.recalculate_root_lines();
+    recalculate_accurately() {
+        if (zeros.length <= 2 && poles.length <= 2) {
+            this.recalculate_root_lines(10000, 1.5);
+        } else {
+            const max_exponent = math.sqrt(math.max(zeros.length, poles.length));
+            this.recalculate_root_lines(3000, max_exponent);
+        }
     }
 
-    recalculate_root_lines() {
+    recalculate_root_lines(n_ks, max_exponent) {
         // 1 + KP = 0
         // P = counter / denominator
         // denominator + K counter = 0
         console.log('calculating root lines');
 
-        const counter = Polynomial.fromRoots(zeros);
-        const denominator = Polynomial.fromRoots(poles);
+        const counter = Polynomial.fromRoots(zeros).monic();
+        const denominator = Polynomial.fromRoots(poles).monic();
+        const use_quadratic = zeros.length <= 2 && poles.length <= 2;
 
-        const ks = math.range(0, this.n_ks + 1).toArray()
-            .map(i => Math.pow(10, (i / this.n_ks - .5) * 2 * this.max_exponent));
 
-        const calculate_roots = (poly, est) => {
-            let roots = [];
-            poly = poly.monic();
-            while (poly.coeff[0].abs() === 0) {
-                roots.push(Complex.ZERO);
-                poly = poly.div('x').monic();
+        let roots_per_K;
+
+        if (use_quadratic) {
+            const ks = math.range(0, n_ks + 1).toArray()
+                .map(i => Math.pow(10, (i / n_ks - .5) * 2 * max_exponent));
+
+            const ca = (counter.coeff[2] || {}).re || 0;
+            const cb = (counter.coeff[1] || {}).re || 0;
+            const cc = (counter.coeff[0] || {}).re || 0;
+            const da = (denominator.coeff[2] || {}).re || 0;
+            const db = (denominator.coeff[1] || {}).re || 0;
+            const dc = (denominator.coeff[0] || {}).re || 0;
+
+            // use quadratic formula to estimate roots
+            roots_per_K = ks.map(K => {
+                // const poly = counter.mul(K).add(denominator).monic();
+
+                const a = ca * K + da;
+                const b = cb * K + db;
+                const c = cc * K + dc;
+
+                const D = Complex(b * b - 4 * a * c);
+                return [
+                    D.sqrt().add(-b).mul(1 / 2 / a),
+                    D.sqrt().add(b).mul(-1 / 2 / a)
+                ];
+            })
+
+        } else {
+            // use newton-rhapson with estimates
+            roots_per_K = new Array(n_ks);
+
+            const calculate_roots = (poly, est) => {
+                let roots = [];
+                poly = poly.monic();
+                while (poly.coeff[0].abs() === 0) {
+                    roots.push(Complex.ZERO);
+                    poly = poly.div('x').monic();
+                }
+
+                if (est === undefined) {
+                    est = Array(poly.degree()).fill().map(this.complex_rand)
+                }
+
+                poly.complexRoots(est).root.forEach(root => roots.push(root));
+
+                return roots
+            };
+
+            const ks = math.range(0, n_ks + 1).toArray()
+                .map(i => Math.pow(10, (i / n_ks - .5) * 2 * max_exponent));
+
+            // we estimate the roots using Newton Rhapson
+            // use roots at previous K value as initial guess
+            //
+            roots_per_K[0] = calculate_roots(counter.mul(ks[0]).add(denominator));
+            for (let i = 1; i < n_ks; i++) {
+                let estimated_roots = roots_per_K[i - 1];
+                roots_per_K[i] = calculate_roots(
+                    counter.mul(ks[i]).add(denominator),
+                    estimated_roots
+                );
             }
-
-            if (est === undefined) {
-                est = Array(poly.degree()).fill().map(this.complex_rand)
-            }
-
-            poly.complexRoots(est).root.forEach(root => roots.push(root));
-
-            return roots
-        };
-
-        const roots_per_K = new Array(this.n_ks);
-        roots_per_K[0] = calculate_roots(counter.mul(ks[0]).add(denominator));
-
-        for (let i = 1; i < this.n_ks; i++) {
-            let estimated_roots = roots_per_K[i - 1];
-            roots_per_K[i] = calculate_roots(
-                counter.mul(ks[i]).add(denominator),
-                estimated_roots
-            );
         }
 
         this.root_lines = roots_per_K[0].map(() => []);
@@ -895,36 +937,30 @@ class PZ_Table {
                 // details.open = true;
                 const arg = p.arg() / math.PI * 180;
                 if (p.im === 0) {
-                    details.innerHTML = [
-                        '<summary>',
-                        p.toString(),
-                        '</summary>',
-                        '<div>',
-                        '<p>Value</p>',
-                        `<input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">`,
-                        `<input type="text" value="${p.re}" concept="re">`,
-                        '</div>',
-                    ].join('');
+                    details.innerHTML = `
+                        <summary>${p.toString()}</summary>
+                        <div>
+                        <p>Value</p>
+                        <input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">
+                        <input type="text" value="${p.re}" concept="re">
+                        </div>`;
                 } else {
-                    details.innerHTML = [
-                        '<summary>',
-                        p.toString().replace('+', '±'),
-                        '</summary>',
-                        '<div>',
-                        '<p>Real</p>',
-                        `<input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">`,
-                        `<input type="text" value="${p.re}" concept="re">`,
-                        '<p>Imag</p>',
-                        `<input type="range" value="${p.im}" concept="im" min="0" max="10" step=".1">`,
-                        `<input type="text" value="${p.im}" concept="im">`,
-                        '<p>Mod</p>',
-                        `<input type="range" value="${p.abs()}" concept="abs" min="0" max="10" step=".1">`,
-                        `<input type="text" value="${p.abs()}" concept="abs">`,
-                        '<p>Arg</p>',
-                        `<input type="range" value="${arg}" concept="arg" min="0" max="180" step="1">`,
-                        `<input type="text" value="${arg}" concept="arg">`,
-                        '</div>',
-                    ].join('');
+                    const summary = p.toString().replace('+', '±');
+                    details.innerHTML = `
+                        <summary>${summary}</summary>
+                        <div>
+                        <p>Real</p>
+                        <input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">
+                        <input type="text" value="${p.re}" concept="re">
+                        <p>Imag</p>
+                        <input type="range" value="${p.im}" concept="im" min="0" max="10" step=".1">
+                        <input type="text" value="${p.im}" concept="im">
+                        <p>Mod</p>
+                        <input type="range" value="${p.abs()}" concept="abs" min="0" max="10" step=".1">
+                        <input type="text" value="${p.abs()}" concept="abs">
+                        <p>Arg</p>
+                        <input type="range" value="${arg}" concept="arg" min="0" max="180" step="1">
+                        <input type="text" value="${arg}" concept="arg"></div>`;
                 }
                 details.querySelectorAll('input').forEach(input => {
                     input.p = p;
@@ -997,9 +1033,11 @@ class PZ_Table {
                     summary.innerHTML = input.value;
                 }
 
-                if (input.type !== 'range') {
+                if (input.type === 'range') {
+                    RL.recalculate_quickly();
+                } else {
                     // text input
-                    RL.recalculate_root_lines();
+                    RL.recalculate_accurately();
                 }
                 IN.redraw();
                 OUT.recalculate();
@@ -1011,7 +1049,8 @@ class PZ_Table {
 
             if (input.type === 'range') {
                 input.addEventListener('mouseup', () => {
-                    RL.recalculate_root_lines();
+                    // slider stopped moving
+                    RL.recalculate_accurately();
                 })
             }
         })
@@ -1085,7 +1124,6 @@ document.querySelectorAll('input[name=interactiontype]').forEach(i => {
 document.getElementById('increase_range').addEventListener('click', () => RL.increase_K_range());
 document.getElementById('increase_resolution').addEventListener('click', () => RL.increase_K_resolution());
 
-
 function layoutchanged() {
     let canvases = document.querySelectorAll('canvas');
     canvases.forEach(canvas => {
@@ -1114,7 +1152,7 @@ set_mode('origin');
 // set_mode('nyquist'); // will not start animation on first call!
 // start_animation();
 
-RL.recalculate_root_lines();
+RL.recalculate_accurately();
 G_desc.update();
 PZT.update();
 layoutchanged(); // calls redraw_all
