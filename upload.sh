@@ -4,7 +4,6 @@ rsync -r \
   --exclude=upload.sh \
   --exclude=index.sh \
   --exclude=node_modules \
-  --exclude-from=.gitignore \
   * esat:public_html/cauchy
 rm index.min.js
 sed -i .2.sed_backup s/index.min.js/index.js/g index.html

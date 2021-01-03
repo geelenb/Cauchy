@@ -313,8 +313,7 @@ class InputCanvas {
     }
 
     nyquist_contour() {
-        // const omegas = math.range(0, math.pi, .003).map(x => math.tan(x));
-        const omegas = math.range(-2, 2, 4 / (contour_length / 2)).map(x => math.pow(10, x)).toArray();
+        const omegas = logspace_1(2, contour_length / 2)
         return omegas.concat(...omegas.map(x => -1 / x)).map(o => Complex(0, o));
     }
 
@@ -521,8 +520,7 @@ class RootLocus {
                 return roots
             };
 
-            const ks = math.range(0, n_ks + 1).toArray()
-                .map(i => Math.pow(10, (i / n_ks - .5) * 2 * max_exponent));
+            const ks = logspace_1(max_exponent, n_ks);
 
             // we estimate the roots using Newton Rhapson
             // use roots at previous K value as initial guess
@@ -590,7 +588,7 @@ class RootLocus {
             this.root_lines.forEach(root_line => {
                 const points = root_line.map(s => s.mul(scale).toVector());
 
-                if (true) { // TODO: put on true
+                if (true) {
                     // draw lines
                     ctx.beginPath();
                     ctx.moveTo(...(points[0]));
@@ -1104,6 +1102,10 @@ function round_n(x, n) {
     return Math.round(x * p) / p
 }
 
+function logspace_1(max_10_pow, n) {
+    return new Array(n).fill().map((_, i) => Math.pow(10, max_10_pow * (2 * i / (n - 1) - 1)))
+}
+
 function start_animation() {
     if (window.mode === 'interactive') {
         return;
@@ -1189,3 +1191,4 @@ RL.recalculate_accurately();
 G_desc.update();
 PZT.update();
 layoutchanged(); // calls redraw_all
+
