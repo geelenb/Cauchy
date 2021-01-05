@@ -313,7 +313,7 @@ class InputCanvas {
     }
 
     nyquist_contour() {
-        const omegas = logspace_1(2, contour_length / 2)
+        const omegas = logspace_1(2, contour_length / 2);
         return omegas.concat(...omegas.map(x => -1 / x)).map(o => Complex(0, o));
     }
 
@@ -420,19 +420,19 @@ class RootLocus {
     }
 
     recalculate_quickly() {
-        if (zeros.length <= 2 && poles.length <= 2) {
-            this.recalculate_root_lines(1000);
-        } else {
-            this.recalculate_root_lines(500);
-        }
+		if (zeros.length <= 3 && poles.length <= 3) {
+			this.recalculate_root_lines(1000);
+		} else {
+			this.recalculate_root_lines(500);
+		}
     }
 
     recalculate_accurately() {
-        if (zeros.length <= 2 && poles.length <= 2) {
-            this.recalculate_root_lines(5000);
-        } else {
-            this.recalculate_root_lines(3000);
-        }
+		if (zeros.length <= 3 && poles.length <= 3) {
+			this.recalculate_root_lines(5000);
+		} else {
+			this.recalculate_root_lines(3000);
+		}
     }
 
     recalculate_root_lines(n_ks) {
@@ -440,7 +440,7 @@ class RootLocus {
         // P = counter / denominator
         // denominator + K counter = 0
 
-        const max_exponent = 2
+		const max_exponent = 2;
 
         const counter = Polynomial.fromRoots(zeros).monic();
         const denominator = Polynomial.fromRoots(poles).monic();
@@ -454,47 +454,69 @@ class RootLocus {
                 [poles[0] || Complex(-1000)]
             ];
         } else {
-            const coeff_full = (poly, n) => new Array(n).fill().map(
-                (_, i) => (poly.coeff[i] || {}).re || 0);
+			const coeff_full = (poly, n) => new Array(n).fill().map(
+				(_, i) => (poly.coeff[i] || {}).re || 0);
 
-            let calculate_roots;
+			let calculate_roots;
+			const [c0, c1, c2, c3] = coeff_full(counter, 4);
+			const [d0, d1, d2, d3] = coeff_full(denominator, 4);
 
-            if (order === 2) {
-                // use quadratic formula to estimate roots
-                const [cc, cb, ca] = coeff_full(counter, 3);
-                const [dc, db, da] = coeff_full(denominator, 3);
+			if (order === 2) {
+				// use quadratic formula to estimate roots
 
-                calculate_roots = (k) => {
-                    const a = ca * k + da;
-                    const b = cb * k + db;
-                    const c = cc * k + dc;
+				calculate_roots = (k) => {
+					const a = c2 * k + d2;
+					const b = c1 * k + d1;
+					const c = c0 * k + d0;
 
-                    const D = Complex(b * b - 4 * a * c);
-                    return [
-                        D.sqrt().add(-b).mul(1 / 2 / a),
-                        D.sqrt().add(b).mul(-1 / 2 / a)
-                    ];
-                };
-            } else {
-                console.log('calculating root lines using newton-rhapson');
+					const D = Complex(b * b - 4 * a * c);
+					return [
+						D.sqrt().add(-b).mul(1 / 2 / a),
+						D.sqrt().add(b).mul(-1 / 2 / a)
+					];
+				};
+			} else if (order === 3) {
+				console.log('calculating root lines using cubic equation');
+				const xis = [
+					Complex(1),
+					Complex(-3).sqrt().sub(1).div(2),
+					Complex(-3).sqrt().add(1).div(-2)
+				];
 
-                calculate_roots = (k) => {
-                    let roots = [];
-                    let poly = counter.mul(k).add(denominator).monic();
-                    while (poly.coeff[0].abs() === 0) {
-                        roots.push(Complex.ZERO);
-                        poly = poly.div('x').monic();
-                    }
+				calculate_roots = (k) => {
+					const a = c3 * k + d3;
+					const b = c2 * k + d2;
+					const c = c1 * k + d1;
+					const d = c0 * k + d0;
 
-                    const est = roots_per_K.length ?
-                        roots_per_K[roots_per_K.length - 1].map(r => Complex(r)) :
-                        Array(poly.degree()).fill().map(this.complex_rand);
+					const D_0 = b * b - 3 * a * c;
+					const D_1 = 2 * b * b * b - 9 * a * b * c + 27 * a * a * d;
 
-                    poly.complexRoots(est).root.forEach(root => roots.push(root));
+					const C = Complex(D_1 * D_1 - 4 * D_0 * D_0 * D_0).sqrt().add(D_1).div(2).pow(1 / 3);
+					return xis.map(xi =>
+						xi.mul(C).add(b).add(Complex(D_0.div(xi).div(C)).div(-3 * a)));
+				}
 
-                    return roots
-                };
-            }
+			} else {
+				console.log('calculating root lines using newton-rhapson');
+
+				calculate_roots = (k) => {
+					let roots = [];
+					let poly = counter.mul(k).add(denominator).monic();
+					while (poly.coeff[0].abs() === 0) {
+						roots.push(Complex.ZERO);
+						poly = poly.div('x').monic();
+					}
+
+					const est = roots_per_K.length ?
+						roots_per_K[roots_per_K.length - 1].map(r => Complex(r)) :
+						Array(poly.degree()).fill().map(this.complex_rand);
+
+					poly.complexRoots(est).root.forEach(root => roots.push(root));
+
+					return roots
+				};
+			}
 
             const max_k = math.pow(10, max_exponent);
             let k_multiplier = math.pow(10, max_exponent * 2 / n_ks);
