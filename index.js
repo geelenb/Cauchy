@@ -436,24 +436,25 @@ class RootLocus {
     }
 
     recalculate_root_lines(n_ks) {
-        // 1 + KP = 0
-        // P = counter / denominator
-        // denominator + K counter = 0
+		// 1 + KP = 0
+		// P = counter / denominator
+		// denominator + K counter = 0
 
-		const max_exponent = 2;
 
-        const counter = Polynomial.fromRoots(zeros).monic();
-        const denominator = Polynomial.fromRoots(poles).monic();
-        const order = Math.max(zeros.length, poles.length);
+		const order = Math.max(zeros.length, poles.length);
+		const max_exponent = order;
 
-        let roots_per_K = [];
+		let roots_per_K = [];
 
-        if (order === 1) {
-            roots_per_K = [
-                [zeros[0] || Complex(-1000)],
-                [poles[0] || Complex(-1000)]
-            ];
-        } else {
+		if (order === 1) {
+			roots_per_K = [
+				[zeros[0] || Complex(-1000)],
+				[poles[0] || Complex(-1000)]
+			];
+		} else {
+			const counter = Polynomial.fromRoots(zeros).monic();
+			const denominator = Polynomial.fromRoots(poles).monic();
+
 			const coeff_full = (poly, n) => new Array(n).fill().map(
 				(_, i) => (poly.coeff[i] || {}).re || 0);
 
@@ -494,7 +495,7 @@ class RootLocus {
 
 					const C = Complex(D_1 * D_1 - 4 * D_0 * D_0 * D_0).sqrt().add(D_1).div(2).pow(1 / 3);
 					return xis.map(xi =>
-						xi.mul(C).add(b).add(Complex(D_0.div(xi).div(C)).div(-3 * a)));
+						xi.mul(C).add(b).add(Complex(D_0).div(xi).div(C)).div(-3 * a));
 				}
 
 			} else {
