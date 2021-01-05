@@ -440,11 +440,85 @@ class RootLocus {
 		// P = counter / denominator
 		// denominator + K counter = 0
 
-
 		const order = Math.max(zeros.length, poles.length);
 		const max_exponent = order;
 
 		let roots_per_K = [];
+
+		function solve_quadratic(a, b, c) {
+			const D = Complex(b * b - 4 * a * c);
+			return [
+				D.sqrt().add(-b).mul(1 / 2 / a),
+				D.sqrt().add(b).mul(-1 / 2 / a)
+			];
+		}
+
+		function solve_cubic(a, b, c, d) {
+			const xis = [
+				Complex(1),
+				Complex(-3).sqrt().sub(1).div(2),
+				Complex(-3).sqrt().add(1).div(-2)
+			];
+
+			const D_0 = b * b - 3 * a * c;
+			const D_1 = 2 * b * b * b - 9 * a * b * c + 27 * a * a * d;
+
+			const C = Complex(D_1 * D_1 - 4 * D_0 * D_0 * D_0).sqrt().add(D_1).div(2).pow(1 / 3);
+			return xis.map(xi =>
+				xi.mul(C).add(b).add(Complex(D_0).div(xi).div(C)).div(-3 * a));
+		}
+
+		function solve_quartic(a, b, c, d, e) {
+			if (false) {
+				// https://en.m.wikipedia.org/wiki/Quartic_function#General_formula_for_roots
+
+				const p = (8 * a * c - 3 * b * b) / (8 * a * a);
+				const q = (b * b * b - 4 * a * b * c + 8 * a * a * d) / (8 * a * a * a);
+
+				const D0 = c * c - 3 * b * d + 12 * a * e;
+				const D1 = 2 * c * c * c - 9 * b * c * d + 27 * b * b * e + 27 * a * d * d - 72 * a * c * e;
+
+				const Q = Complex(D1 * D1 - 4 * D0 * D0 * D0).sqrt().add(D1).div(2).pow(1 / 3);
+				const S = Complex(D0).div(Q).add(Q).div(3 * a).sub(2 * p / 3).sqrt().div(2);
+
+				const ssp = S.pow(2).mul(-4).sub(2 * p);
+				const qS = S.div(q).pow(-1);
+
+				return [
+					ssp.add(qS).sqrt().div(+2).sub(S),
+					ssp.add(qS).sqrt().div(-2).sub(S),
+					ssp.sub(qS).sqrt().div(+2).add(S),
+					ssp.sub(qS).sqrt().div(-2).add(S)
+				].map(c => c.sub(b / (4 * a))).sort((c, d) => (c.im - d.im))
+				// numerically unstable
+			} else {
+				// https://quarticequations.com/Quartic.pdf
+				// Ferrari
+				const A3 = b / a;
+				const A2 = c / a;
+				const A1 = d / a;
+				const A0 = e / a;
+
+				const C = A3 / 4;
+				const b2 = A2 - 6 * C * C;
+				const b1 = A1 - 2 * A2 * C + 8 * C * C * C;
+				const b0 = A0 - A1 * C + A2 * C * C - 3 * Math.pow(C, 4);
+
+				const ms = solve_cubic(1, b2, b2 * b2 / 4 - b0, -b1 * b1 / 8);
+				const m = ms.filter(m => m.im === 0)[0] || Complex();
+				const R = m.add(b2).mul(m).add(b2 * b2 / 4).sub(b0).sqrt().mul(b1 > 0 ? 1 : -1);
+
+				const m2b22 = m.add(b).div(-2);
+				const m2sqrt = m.div(2).sqrt();
+				return [
+					m2b22.sub(R).sqrt().mul(+1).add(m2sqrt),
+					m2b22.sub(R).sqrt().mul(-1).add(m2sqrt),
+					m2b22.add(R).sqrt().mul(+1).sub(m2sqrt),
+					m2b22.add(R).sqrt().mul(-1).sub(m2sqrt)
+				].map(c => c.sub(C))
+				// wrong solutions
+			}
+		}
 
 		if (order === 1) {
 			roots_per_K = [
@@ -459,43 +533,42 @@ class RootLocus {
 				(_, i) => (poly.coeff[i] || {}).re || 0);
 
 			let calculate_roots;
-			const [c0, c1, c2, c3] = coeff_full(counter, 4);
-			const [d0, d1, d2, d3] = coeff_full(denominator, 4);
+			// c4 = coeffficient of 4th power in Counter polynomial
+			const [c0, c1, c2, c3, c4] = coeff_full(counter, 5);
+			const [d0, d1, d2, d3, d4] = coeff_full(denominator, 5);
 
 			if (order === 2) {
 				// use quadratic formula to estimate roots
-
 				calculate_roots = (k) => {
 					const a = c2 * k + d2;
 					const b = c1 * k + d1;
 					const c = c0 * k + d0;
 
-					const D = Complex(b * b - 4 * a * c);
-					return [
-						D.sqrt().add(-b).mul(1 / 2 / a),
-						D.sqrt().add(b).mul(-1 / 2 / a)
-					];
+					return solve_quadratic(a, b, c);
 				};
 			} else if (order === 3) {
 				console.log('calculating root lines using cubic equation');
-				const xis = [
-					Complex(1),
-					Complex(-3).sqrt().sub(1).div(2),
-					Complex(-3).sqrt().add(1).div(-2)
-				];
 
 				calculate_roots = (k) => {
-					const a = c3 * k + d3;
-					const b = c2 * k + d2;
-					const c = c1 * k + d1;
-					const d = c0 * k + d0;
+					return solve_cubic(
+						c3 * k + d3,
+						c2 * k + d2,
+						c1 * k + d1,
+						c0 * k + d0
+					);
+				}
 
-					const D_0 = b * b - 3 * a * c;
-					const D_1 = 2 * b * b * b - 9 * a * b * c + 27 * a * a * d;
-
-					const C = Complex(D_1 * D_1 - 4 * D_0 * D_0 * D_0).sqrt().add(D_1).div(2).pow(1 / 3);
-					return xis.map(xi =>
-						xi.mul(C).add(b).add(Complex(D_0).div(xi).div(C)).div(-3 * a));
+			} else if (false) {
+				// quartic methods are slower than newton-rhapson
+				console.log('calculating root lines using quartic equation');
+				calculate_roots = (k) => {
+					return solve_quartic(
+						c4 * k + d4,
+						c3 * k + d3,
+						c2 * k + d2,
+						c1 * k + d1,
+						c0 * k + d0
+					);
 				}
 
 			} else {
@@ -600,16 +673,16 @@ class RootLocus {
             this.root_lines.forEach(root_line => {
                 const points = root_line.map(s => s.mul(scale).toVector());
 
-                if (true) {
-                    // draw lines
-                    ctx.beginPath();
-                    ctx.moveTo(...(points[0]));
-                    points.forEach(point => {
-                        ctx.lineTo(...point);
-                    });
-                    ctx.stroke();
-                } else {
-                    // draw dots
+				if (false) {
+					// draw lines
+					ctx.beginPath();
+					ctx.moveTo(...(points[0]));
+					points.forEach(point => {
+						ctx.lineTo(...point);
+					});
+					ctx.stroke();
+				} else {
+					// draw dots
 
                     points.forEach(point => {
                         ctx.fillStyle = ctx.strokeStyle;
