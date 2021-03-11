@@ -520,7 +520,9 @@ class RootLocus {
 			}
 		}
 
-		if (order === 1) {
+		if (order === 0) {
+			roots_per_K = [[]];
+		} else if (order === 1) {
 			roots_per_K = [
 				[zeros[0] || Complex(-1000)],
 				[poles[0] || Complex(-1000)]
@@ -537,7 +539,9 @@ class RootLocus {
 			const [c0, c1, c2, c3, c4] = coeff_full(counter, 5);
 			const [d0, d1, d2, d3, d4] = coeff_full(denominator, 5);
 
-			if (order === 2) {
+			if (order === 0) {
+				calculate_roots = (k) => [];
+			} else if (order === 2) {
 				// use quadratic formula to estimate roots
 				calculate_roots = (k) => {
 					const a = c2 * k + d2;
@@ -671,9 +675,9 @@ class RootLocus {
             ctx.lineWidth = sharpness * 2;
 
             this.root_lines.forEach(root_line => {
-                const points = root_line.map(s => s.mul(scale).toVector());
+				const points = root_line.map(s => s.mul(scale).toVector());
 
-				if (false) {
+				if (true) {
 					// draw lines
 					ctx.beginPath();
 					ctx.moveTo(...(points[0]));
@@ -1053,33 +1057,34 @@ class PZ_Table {
         const table_for_list = (list) => {
             const details_list = list.filter(p => p.im >= 0).map(p => {
                 const details = document.createElement('details');
-                // details.open = true;
+				details.open = true;
                 const arg = p.arg() / math.PI * 180;
                 if (p.im === 0) {
                     details.innerHTML = `
-                        <summary>${p.toString()}</summary>
-                        <div>
-                        <p>Value</p>
-                        <input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">
-                        <input type="text" value="${p.re}" concept="re">
+                        <summary>${p.toString().replace('i', 'j')}</summary>
+						<div>
+							<p>Value</p>
+							<input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">
+							<input type="text" value="${p.re}" concept="re">
                         </div>`;
                 } else {
-                    const summary = p.toString().replace('+', '±');
-                    details.innerHTML = `
+					const summary = p.toString().replace('i', 'j').replace('+', '±');
+					details.innerHTML = `
                         <summary>${summary}</summary>
                         <div>
-                        <p>Real</p>
-                        <input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">
-                        <input type="text" value="${p.re}" concept="re">
-                        <p>Imag</p>
-                        <input type="range" value="${p.im}" concept="im" min="0" max="10" step=".1">
-                        <input type="text" value="${p.im}" concept="im">
-                        <p>Mod</p>
-                        <input type="range" value="${p.abs()}" concept="abs" min="0" max="10" step=".1">
-                        <input type="text" value="${p.abs()}" concept="abs">
-                        <p>Arg</p>
-                        <input type="range" value="${arg}" concept="arg" min="0" max="180" step="1">
-                        <input type="text" value="${arg}" concept="arg"></div>`;
+							<p>Real</p>
+							<input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">
+							<input type="text" value="${p.re}" concept="re">
+							<p>Imag</p>
+							<input type="range" value="${p.im}" concept="im" min="0" max="10" step=".1">
+							<input type="text" value="${p.im}" concept="im">
+							<p>Mod</p>
+							<input type="range" value="${p.abs()}" concept="abs" min="0" max="10" step=".1">
+							<input type="text" value="${p.abs()}" concept="abs">
+							<p>Arg</p>
+							<input type="range" value="${arg}" concept="arg" min="0" max="180" step="1">
+                        <input type="text" value="${arg}" concept="arg">
+                        </div>`;
                 }
                 details.querySelectorAll('input').forEach(input => {
                     input.p = p;
@@ -1145,8 +1150,8 @@ class PZ_Table {
                     }
 
                     set_complex(input.p, new_p);
-                    set_complex(input.conj, new_p.conjugate());
-                    summary.innerHTML = new_p.toString().replace('+', '±');
+					set_complex(input.conj, new_p.conjugate());
+					summary.innerHTML = new_p.toString().replace('i', 'j').replace('+', '±');
                 } else {
                     input.p.re = parseFloat(input.value);
                     summary.innerHTML = input.value;
