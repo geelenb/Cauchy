@@ -14,6 +14,35 @@ const zeros = [Complex(-2)];
 const poles = [Complex(-1, 1), Complex(-1, -1)];
 let K = 1;
 
+function init_from_args() {
+	try {
+		let args = (
+			window.location.href
+				.toLowerCase()
+				.split('?')[1]
+				.split('&')
+				.map(v => v.split('='))
+				.reduce((acc, arg) => {
+						acc[arg[0]] = [arg[1], ...(acc[arg[0]] || [])];
+						return acc
+					},
+					{})
+		);
+		if (args['pole'] || args['zero']) {
+			zeros.splice(0, zeros.length, ...((args['zero'] || []).map(s=> s.replace('j', 'i')).map(s=> {console.log(s); return s}).map(s=>Complex(s))));
+			zeros.push(...zeros.filter(c => c.im).map(c => c.conjugate()));
+			poles.splice(0, poles.length, ...((args['pole'] || []).map(s=> s.replace('j', 'i')).map(s=> {console.log(s); return s}).map(s=>Complex(s))));
+			poles.push(...poles.filter(c => c.im).map(c => c.conjugate()));
+		}
+		if (args['k']) {
+			K = parseFloat(args['k'][0]);
+		}
+	} catch {}
+}
+
+init_from_args()
+
+
 const mul = (a, b) => a.mul(b);
 
 function f(s) {
@@ -550,17 +579,17 @@ class RootLocus {
 
 					return solve_quadratic(a, b, c);
 				};
-			} else if (order === 3) {
-				console.log('calculating root lines using cubic equation');
-
-				calculate_roots = (k) => {
-					return solve_cubic(
-						c3 * k + d3,
-						c2 * k + d2,
-						c1 * k + d1,
-						c0 * k + d0
-					);
-				}
+			// } else if (order === 3) {
+			// 	console.log('calculating root lines using cubic equation');
+			//
+			// 	calculate_roots = (k) => {
+			// 		return solve_cubic(
+			// 			c3 * k + d3,
+			// 			c2 * k + d2,
+			// 			c1 * k + d1,
+			// 			c0 * k + d0
+			// 		);
+			// 	}
 
 			} else if (false) {
 				// quartic methods are slower than newton-rhapson
@@ -635,6 +664,7 @@ class RootLocus {
     redraw() {
         const ctx = this.ctx;
         const draw_closed_loop_poles = () => {
+        	// The plusses in the rl diagram
             // 1 + KP = 0
             // P = counter / denominator
             // denominator + K counter = 0
@@ -642,7 +672,10 @@ class RootLocus {
             const counter = Polynomial.fromRoots(zeros);
             const denominator = Polynomial.fromRoots(poles);
 
-            const poly = counter.mul(K).add(denominator).monic();
+            let poly = counter.mul(K).add(denominator).monic();
+            while (!(poly.coeff[0])) {
+            	poly = poly.div('x')
+			}
 
             const est = Array(poly.degree()).fill(0).map(this.complex_rand);
             poly.complexRoots(est).root.forEach(root => {
