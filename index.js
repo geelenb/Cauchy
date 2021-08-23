@@ -17,7 +17,7 @@ let K = 1;
 function init_from_args() {
 	try {
 		let args = (
-			window.location.href
+			window.location.search
 				.toLowerCase()
 				.split('?')[1]
 				.split('&')
@@ -29,26 +29,36 @@ function init_from_args() {
 					{})
 		);
 		if (args['pole'] || args['zero']) {
-			zeros.splice(0, zeros.length, ...((args['zero'] || []).map(s=> s.replace('j', 'i')).map(s=> {console.log(s); return s}).map(s=>Complex(s))));
-			zeros.push(...zeros.filter(c => c.im).map(c => c.conjugate()));
-			poles.splice(0, poles.length, ...((args['pole'] || []).map(s=> s.replace('j', 'i')).map(s=> {console.log(s); return s}).map(s=>Complex(s))));
-			poles.push(...poles.filter(c => c.im).map(c => c.conjugate()));
+			zeros.splice(0, zeros.length, ...((args['zero'] || []).map(s => s.replace('j', 'i')).map(s => Complex(s))));
+			// zeros.push(...zeros.filter(c => c.im).map(c => c.conjugate()));
+			poles.splice(0, poles.length, ...((args['pole'] || []).map(s => s.replace('j', 'i')).map(s => Complex(s))));
+			// poles.push(...poles.filter(c => c.im).map(c => c.conjugate()));
 		}
 		if (args['k']) {
 			K = parseFloat(args['k'][0]);
 		}
-	} catch {}
+	} catch {
+	}
 }
 
 init_from_args()
+
+function update_location() {
+	const get_param = [
+		...zeros.map(s => 'zero=' + s.toString()),
+		...poles.map(s => 'pole=' + s.toString()),
+	].join("&").replaceAll('i', 'j').replaceAll(' ', '');
+	// parent.location.hash = get_param;
+	window.history.replaceState(null, null, window.location.pathname + "?" + get_param)
+}
 
 
 const mul = (a, b) => a.mul(b);
 
 function f(s) {
-    const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
-    const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
-    return counter.mul(K).div(denominator);
+	const counter = zeros.map(z => s.sub(z)).reduce(mul, Complex.ONE);
+	const denominator = poles.map(p => s.sub(p)).reduce(mul, Complex.ONE);
+	return counter.mul(K).div(denominator);
 }
 
 function add_drag(ctx) {
@@ -230,25 +240,27 @@ class InputCanvas {
                 // remove the poles_or_zeros in-place:
                 poles_or_zeros.splice(0, poles_or_zeros.length, ...pz_to_keep);
             } else {
-                // if no poles_or_zeros were removed: add one
-                clicked = Complex(
-                    round_n(clicked.re, 1),
-                    round_n(clicked.im, 1)
-                );
-                poles_or_zeros.push(clicked);
-                if (clicked.im !== 0) {
-                    poles_or_zeros.push(clicked.conjugate())
-                }
-            }
+				// if no poles_or_zeros were removed: add one
+				clicked = Complex(
+					round_n(clicked.re, 1),
+					round_n(clicked.im, 1)
+				);
+				poles_or_zeros.push(clicked);
+				if (clicked.im !== 0) {
+					poles_or_zeros.push(clicked.conjugate())
+				}
+			}
 
-            RL.recalculate_accurately();
-            IN.redraw();
-            OUT.recalculate();
-            OUT.redraw();
-            G_desc.update();
-            bode.recalculate();
-            bode.redraw();
-            PZT.update();
+			update_location();
+
+			RL.recalculate_accurately();
+			IN.redraw();
+			OUT.recalculate();
+			OUT.redraw();
+			G_desc.update();
+			bode.recalculate();
+			bode.redraw();
+			PZT.update();
 
             event.preventDefault();
         };
@@ -1194,7 +1206,8 @@ class PZ_Table {
                     RL.recalculate_quickly();
                 } else {
                     // text input
-                    RL.recalculate_accurately();
+					RL.recalculate_accurately();
+					update_location();
                 }
                 IN.redraw();
                 OUT.recalculate();
@@ -1207,7 +1220,8 @@ class PZ_Table {
             if (input.type === 'range') {
                 input.addEventListener('mouseup', () => {
                     // slider stopped moving
-                    RL.recalculate_accurately();
+					RL.recalculate_accurately();
+					update_location();
                 })
             }
         })
