@@ -11,7 +11,7 @@ body > div.column {
     text-align: center;
     width: 23vw;
     float: left;
-    margin: 0 1vw;
+    margin: 0 .5vw;
 }
 
 body > div#credits {
@@ -56,6 +56,18 @@ p, div {
     text-align: left;
 }
 
+#pz_table details {
+    margin-bottom: 12px;
+}
+
+#pz_table summary div {
+    display: inline;
+}
+
+#pz_table summary button {
+    float: right;
+}
+
 #pz_table details > div {
     display: grid;
     grid-template-columns: 5ex auto 5ex;
@@ -69,4 +81,9 @@ p, div {
 
 #pz_table p {
     margin: 0;
+}
+
+#pz_table button.restart {
+    /*display: block;*/
+    /*margin: 24px auto 0;*/
 }

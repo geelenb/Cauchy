@@ -10,9 +10,17 @@ const rl_ctx = document.getElementById('rlocus_canvas').getContext('2d');
 const krange = document.getElementById('krange');
 
 
-const zeros = [Complex(-2)];
-const poles = [Complex(-1, 1), Complex(-1, -1)];
+const zeros = [];
+const poles = [];
 let K = 1;
+
+function init_default() {
+	zeros.splice(0, zeros.length, Complex(-2));
+	poles.splice(0, poles.length, Complex(-1, 1), Complex(-1, -1));
+	K = 1;
+}
+
+init_default();
 
 function init_from_args() {
 	try {
@@ -41,17 +49,16 @@ function init_from_args() {
 	}
 }
 
-init_from_args()
+init_from_args();
 
 function update_location() {
 	const get_param = [
-		...zeros.map(s => 'zero=' + s.toString()),
-		...poles.map(s => 'pole=' + s.toString()),
+		...zeros.map(s => 'zero=' + s.round(3).toString()),
+		...poles.map(s => 'pole=' + s.round(3).toString()),
 	].join("&").replaceAll('i', 'j').replaceAll(' ', '');
 	// parent.location.hash = get_param;
 	window.history.replaceState(null, null, window.location.pathname + "?" + get_param)
 }
-
 
 const mul = (a, b) => a.mul(b);
 
@@ -956,38 +963,40 @@ class BodePlot {
     }
 
     add_sketch_lines() {
-        // todo: "running" sketch
-        // Type of the system l
-        // const l = poles.filter(p => p.equals(Complex.ZERO)).length -
-        //     zeros.filter(z => z.equals(Complex.ZERO)).length;
+		// todo: "running" sketch
+		// Type of the system l
+		// const l = poles.filter(p => p.equals(Complex.ZERO)).length -
+		//     zeros.filter(z => z.equals(Complex.ZERO)).length;
 
-        const pz_merged_sorted = [...poles, ...zeros];
+		const ctx = this.ctx;
+		ctx.save();
+		ctx.lineWidth = .5 * sharpness;
 
-        const ctx = this.ctx;
-        ctx.save();
-        ctx.strokeStyle = 'gray';
-        ctx.lineWidth = .5 * sharpness;
-        pz_merged_sorted.forEach(p => {
-            const omega_n = p.abs();
-            if (p.im < 0) {
-                return;
-            }
+		const draw_vertical_lines = p => {
+			const omega_n = p.abs();
+			if (p.im < 0) {
+				return;
+			}
 
-            // todo: kleur (pool: rood, np: blauw)
+			const x = this.omega_pow_to_x(math.log10(omega_n));
+			ctx.beginPath();
+			ctx.moveTo(x, this.phase_bottom);
+			ctx.lineTo(x, this.phase_top);
+			ctx.stroke();
 
-            const x = this.omega_pow_to_x(math.log10(omega_n));
-            ctx.beginPath();
-            ctx.moveTo(x, this.phase_bottom);
-            ctx.lineTo(x, this.phase_top);
-            ctx.stroke();
+			ctx.beginPath();
+			ctx.moveTo(x, this.mag_bottom);
+			ctx.lineTo(x, this.mag_top);
+			ctx.stroke();
+		};
 
-            ctx.beginPath();
-            ctx.moveTo(x, this.mag_bottom);
-            ctx.lineTo(x, this.mag_top);
-            ctx.stroke();
-        });
-        ctx.restore();
-    }
+		ctx.strokeStyle = 'red';
+		poles.forEach(draw_vertical_lines);
+		ctx.strokeStyle = 'green';
+		zeros.forEach(draw_vertical_lines);
+
+		ctx.restore();
+	}
 
     redraw() {
         const ctx = this.ctx;
@@ -1035,8 +1044,8 @@ class GDescription {
             if (roots.length == 0) {
                 return '1';
             }
-            const complex_to_str = c => (c.re < 0 || (c.re == 0 && c.im < 0)) ? c.toString() : ('+' + c.toString());
-            const complex_to_s_minus = c => Complex.ZERO.equals(c) ? 's' : '(s' + complex_to_str(Complex(0).sub(c)) + ')';
+			const complex_to_str = c => (c.re < 0 || (c.re == 0 && c.im < 0)) ? c.round(3).toString() : ('+' + c.round(3).toString());
+			const complex_to_s_minus = c => Complex.ZERO.equals(c) ? 's' : '(s' + complex_to_str(Complex(0).sub(c)) + ')';
             const add_spacing = s => s.replaceAll('i', 'j').replaceAll('+', '&nbsp+&nbsp').replaceAll('-', '&nbsp-&nbsp');
 
             // TODO : powers for double roots?
@@ -1044,7 +1053,7 @@ class GDescription {
             let html = roots.map(complex_to_s_minus).map(add_spacing).join('&nbsp;');
 
             if (roots.length == 1) {
-                html = html.substr(1, html.length - 2)
+				html = html.substring(1, html.length - 1)
             }
 
             return html
@@ -1105,17 +1114,24 @@ class PZ_Table {
 				details.open = true;
                 const arg = p.arg() / math.PI * 180;
                 if (p.im === 0) {
+					const summary = p.round(3).toString().replace('i', 'j')
                     details.innerHTML = `
-                        <summary>${p.toString().replace('i', 'j')}</summary>
+                        <summary>
+                        	<div>${summary}</div>
+                        	<button class="remove">Remove</button>
+                        </summary>
 						<div>
 							<p>Value</p>
 							<input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">
 							<input type="text" value="${p.re}" concept="re">
                         </div>`;
                 } else {
-					const summary = p.toString().replace('i', 'j').replace('+', '±');
+					const summary = p.round(3).toString().replace('i', 'j').replace('+', '±');
 					details.innerHTML = `
-                        <summary>${summary}</summary>
+                        <summary>
+                        	<div>${summary}</div>
+                        	<button class="remove">Remove</button>
+                        </summary>
                         <div>
 							<p>Real</p>
 							<input type="range" value="${p.re}" concept="re" min="-5" max="5" step=".1">
@@ -1128,22 +1144,22 @@ class PZ_Table {
 							<input type="text" value="${p.abs()}" concept="abs">
 							<p>Arg</p>
 							<input type="range" value="${arg}" concept="arg" min="0" max="180" step="1">
-                        <input type="text" value="${arg}" concept="arg">
+                        	<input type="text" value="${arg}" concept="arg">
                         </div>`;
-                }
-                details.querySelectorAll('input').forEach(input => {
-                    input.p = p;
-                });
+				}
+				details.querySelectorAll('input, button').forEach(input => {
+					details.p = p;
+				});
 
-                details.p = p;
+				details.p = p;
 
-                return details;
-            });
+				return details;
+			});
 
             list.filter(p => p.im < 0).forEach(p => {
                 const details = details_list.find(summ => summ.p.conjugate().equals(p));
                 details.querySelectorAll('input').forEach(input => {
-                    input.conj = p;
+					details.conj = p;
                 });
             });
 
@@ -1151,55 +1167,77 @@ class PZ_Table {
         };
 
         this.root.innerHTML = '<h3>Zeros</h3>';
-        table_for_list(zeros).forEach(t => this.root.appendChild(t));
-        this.root.insertAdjacentHTML('beforeend', '<h3>Poles</h3>');
-        table_for_list(poles).forEach(t => this.root.appendChild(t));
+		table_for_list(zeros).forEach(t => this.root.appendChild(t));
+		this.root.insertAdjacentHTML('beforeend', '<h3>Poles</h3>');
+		table_for_list(poles).forEach(t => this.root.appendChild(t));
+		this.root.insertAdjacentHTML('beforeend', '<button class="restart">Restart</button>');
 
         this.add_eventlisteners();
     }
 
     add_eventlisteners() {
-        const set_complex = (old, new_) => {
-            old.re = new_.re;
-            old.im = new_.im;
-        };
+		const set_complex = (old, new_) => {
+			old.re = new_.re;
+			old.im = new_.im;
+		};
 
-        this.root.querySelectorAll('input').forEach(input => {
-            const details = input.closest('details');
-            const summary = details.getElementsByTagName('summary')[0];
-            input.addEventListener('input', event => {
-                if (input.type === 'range') {
-                    input.nextElementSibling.value = input.value;
-                } else if (input.type === 'text') {
-                    input.previousElementSibling.value = input.value;
-                }
+		this.root.querySelectorAll('button.remove').forEach(button => {
+			const details = button.closest('details');
+			button.addEventListener('click', (event) => {
+				const newpoles = poles.filter(p => p != details.p && p != details.conj);
+				poles.splice(0, poles.length, ...newpoles);
+				const newzeros = zeros.filter(p => p != details.p && p != details.conj);
+				zeros.splice(0, zeros.length, ...newzeros);
 
-                const concept = input.attributes['concept'].value;
-                if (input.conj !== undefined) {
-                    let new_p;
-                    // pole or zero PAIR; update both
-                    if (concept == 'abs' || concept == 'arg') {
-                        new_p = Complex({
-                            arg: details.querySelector('input[concept=arg]').value * math.PI / 180,
-                            abs: details.querySelector('input[concept=abs]').value,
-                        });
-                        details.querySelectorAll('input[concept=re]').forEach(input => input.value = new_p.re);
-                        details.querySelectorAll('input[concept=im]').forEach(input => input.value = new_p.im);
-                    } else {
-                        new_p = Complex(
-                            details.querySelector('input[concept=re]').value,
-                            details.querySelector('input[concept=im]').value,
-                        );
-                        details.querySelectorAll('input[concept=arg]').forEach(input => input.value = new_p.arg() * 180 / math.PI);
-                        details.querySelectorAll('input[concept=abs]').forEach(input => input.value = new_p.abs());
-                    }
+				details.remove();
+				RL.recalculate_accurately();
+				IN.redraw();
+				OUT.recalculate();
+				OUT.redraw();
+				G_desc.update();
+				bode.recalculate();
+				bode.redraw();
+				update_location();
+			});
+		})
 
-                    set_complex(input.p, new_p);
-					set_complex(input.conj, new_p.conjugate());
-					summary.innerHTML = new_p.toString().replace('i', 'j').replace('+', '±');
-                } else {
-                    input.p.re = parseFloat(input.value);
-                    summary.innerHTML = input.value;
+		this.root.querySelectorAll('input').forEach(input => {
+			const details = input.closest('details');
+			const summary = details.querySelector('summary > div');
+
+			input.addEventListener('input', event => {
+				if (input.type === 'range') {
+					input.nextElementSibling.value = input.value;
+				} else if (input.type === 'text') {
+					input.previousElementSibling.value = input.value;
+				}
+
+				const concept = input.attributes['concept'].value;
+				if (details.conj !== undefined) {
+					// pole or zero PAIR; update both
+					let new_p;
+					if (concept == 'abs' || concept == 'arg') {
+						new_p = Complex({
+							arg: details.querySelector('input[concept=arg]').value * math.PI / 180,
+							abs: details.querySelector('input[concept=abs]').value,
+						});
+						details.querySelectorAll('input[concept=re]').forEach(input => input.value = new_p.re);
+						details.querySelectorAll('input[concept=im]').forEach(input => input.value = new_p.im);
+					} else {
+						new_p = Complex(
+							details.querySelector('input[concept=re]').value,
+							details.querySelector('input[concept=im]').value,
+						);
+						details.querySelectorAll('input[concept=arg]').forEach(input => input.value = new_p.arg() * 180 / math.PI);
+						details.querySelectorAll('input[concept=abs]').forEach(input => input.value = new_p.abs());
+					}
+
+					set_complex(details.p, new_p);
+					set_complex(details.conj, new_p.conjugate());
+					summary.innerHTML = new_p.round(3).toString().replace('i', 'j').replace('+', '±');
+				} else {
+					details.p.re = parseFloat(input.value);
+					summary.innerHTML = input.value;
                 }
 
                 if (input.type === 'range') {
@@ -1215,17 +1253,27 @@ class PZ_Table {
                 G_desc.update();
                 bode.recalculate();
                 bode.redraw();
-            });
+			});
 
-            if (input.type === 'range') {
-                input.addEventListener('mouseup', () => {
-                    // slider stopped moving
+			if (input.type === 'range') {
+				input.addEventListener('mouseup', () => {
+					// slider stopped moving
 					RL.recalculate_accurately();
 					update_location();
-                })
-            }
-        })
-    }
+				})
+			}
+		})
+
+		this.root.querySelector('button.restart').addEventListener('click', (event) => {
+			init_default();
+
+			RL.recalculate_accurately();
+			G_desc.update();
+			PZT.update();
+			update_location();
+			layoutchanged(); // calls redraw_all
+		});
+	}
 }
 
 /**
